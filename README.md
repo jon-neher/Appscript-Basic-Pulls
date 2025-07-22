@@ -61,7 +61,7 @@ After that you can iterate with the usual `push` / `pull` / `open` commands as d
 
 ## Project layout
 
-- `src/` – All Apps Script `.js/gs/ts` files and the `appsscript.json` manifest.
+- `src/` – All Apps Script `.gs` (and plain `.js`) files plus the `appsscript.json` manifest.
 - `docs/` – Additional project documentation.
 
 ## Manifest highlights (`src/appsscript.json`)
@@ -73,3 +73,23 @@ After that you can iterate with the usual `push` / `pull` / `open` commands as d
 ## License
 
 This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
+
+## Configuration Options
+
+All configuration now lives in a single file: `src/Config.gs`. Edit the
+constants in that file and push with `clasp push`—no JSON, YAML, or
+environment variables required.
+
+| Key | Type | Required | Constraints |
+|-----|------|----------|-------------|
+| DOCUMENTATION_BASE_URL | string (URL) | ✅ | Must start with `http://` or `https://`. |
+| PAGE_ANALYSIS_LIMIT | integer | ✅ | 1 ≤ value ≤ 1000 |
+| LLM_PROVIDER | `'openai' \| 'gemini'` | ✅ | — |
+| OPENAI_API_KEY | string | conditional | Required when `LLM_PROVIDER === 'openai'`. |
+| GEMINI_API_KEY | string | conditional | Required when `LLM_PROVIDER === 'gemini'`. |
+
+Validation runs at **load-time**—a bad value throws an Error before the bot can
+process any Chat events. Because configuration is checked synchronously there
+is no need for network reachability tests or external file parsing.
+
+

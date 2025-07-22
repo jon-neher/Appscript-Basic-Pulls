@@ -9,9 +9,22 @@
     "push": "clasp push",
     "pull": "clasp pull",
     "deploy": "clasp deploy --description \"Deploy from CI\"",
-    "open": "clasp open"
+    "open": "clasp open",
+    "test": "jest --runInBand"
   },
   "dependencies": {
-    "@google/clasp": "^3.1.1"
+    "@google/clasp": "3.0.6-alpha"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nock": "^13.5.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "gs"
+    ]
   }
 }
