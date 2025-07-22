@@ -1,0 +1,17 @@
+{
+  "name": "appscript-chat-knowledge",
+  "version": "0.1.0",
+  "description": "Google Apps Script Chat bot for knowledge management.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "login": "clasp login --no-localhost",
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "deploy": "clasp deploy --description \"Deploy from CI\"",
+    "open": "clasp open"
+  },
+  "dependencies": {
+    "@google/clasp": "^3.1.1"
+  }
+}

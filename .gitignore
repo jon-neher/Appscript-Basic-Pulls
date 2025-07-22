@@ -137,3 +137,11 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Google Apps Script clasp auth files
+.clasprc.json
+# Uncomment the next line if you prefer to keep project-specific clasp config local
+.clasp.json
+
+# macOS metadata
+.DS_Store
