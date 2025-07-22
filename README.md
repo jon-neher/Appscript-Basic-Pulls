@@ -87,9 +87,31 @@ environment variables required.
 | LLM_PROVIDER | `'openai' \| 'gemini'` | ✅ | — |
 | OPENAI_API_KEY | string | conditional | Required when `LLM_PROVIDER === 'openai'`. |
 | GEMINI_API_KEY | string | conditional | Required when `LLM_PROVIDER === 'gemini'`. |
+| OPENAI_ENDPOINT | `'chat' \| 'responses'` | optional | Defaults to `'chat'`. `'responses'` routes all requests to the OpenAI **Responses** v1 endpoint instead of Chat Completions. |
+| OPENAI_MODEL_ID | string | optional | Defaults to `'gpt-3.5-turbo'`. |
+| GEMINI_MODEL_ID | string | optional | Defaults to `'gemini-pro'`. |
+| RESPONSES_BETA | boolean | optional | Include `OpenAI-Beta: responses=v1` header when using responses endpoint. Defaults to `false`. |
 
 Validation runs at **load-time**—a bad value throws an Error before the bot can
 process any Chat events. Because configuration is checked synchronously there
 is no need for network reachability tests or external file parsing.
+
+
+### Quick-start: Switch to the OpenAI *Responses* API
+
+If you want every LLM call to hit the brand-new [Responses v1 endpoint](https://platform.openai.com/docs/api-reference/responses/create) simply tweak two keys in `src/Config.gs`:
+
+```js
+const CONFIG = {
+  // …existing required keys…
+
+  OPENAI_ENDPOINT: 'responses', // route traffic to /v1/responses
+  RESPONSES_BETA: true,        // add the required beta header (only while the endpoint is in beta)
+};
+```
+
+No code changes are necessary—`sendThreadForUnderstanding()` will automatically
+convert the chat history into a single prompt string and call the new
+endpoint.
 
 

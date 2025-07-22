@@ -21,6 +21,10 @@
 * @property {LlmProvider} LLM_PROVIDER Which LLM backend to use.
 * @property {string=} OPENAI_API_KEY Secret key for OpenAI – required iff `LLM_PROVIDER === 'openai'`.
 * @property {string=} GEMINI_API_KEY  Secret key for Gemini – required iff `LLM_PROVIDER === 'gemini'`.
+* @property {('chat'|'responses')=} OPENAI_ENDPOINT  Optional – which OpenAI endpoint to use (`'chat'` or `'responses'`). Defaults to `'chat'`.
+* @property {string=} OPENAI_MODEL_ID Optional – model ID used for OpenAI calls. Defaults to `'gpt-3.5-turbo'`.
+* @property {string=} GEMINI_MODEL_ID Optional – model ID used for Gemini calls. Defaults to `'gemini-pro'`.
+* @property {boolean=} RESPONSES_BETA Optional – when `true` includes the `OpenAI-Beta: responses=v1` header for responses endpoint. Defaults to `false`.
 */
 
 (function (global) {
@@ -48,6 +52,12 @@
     // Conditionally required based on LLM_PROVIDER
     OPENAI_API_KEY: 'replace-with-real-key',
     // GEMINI_API_KEY: 'replace-with-real-key',
+
+    // Optional overrides – safe defaults maintain existing behaviour
+    OPENAI_ENDPOINT: 'chat', // 'chat' | 'responses'
+    OPENAI_MODEL_ID: 'gpt-3.5-turbo',
+    GEMINI_MODEL_ID: 'gemini-pro',
+    RESPONSES_BETA: false,
   });
 
   /**
@@ -88,6 +98,39 @@
     }
     if (cfg.LLM_PROVIDER === 'gemini' && !cfg.GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY is required when LLM_PROVIDER is "gemini".');
+    }
+
+    // OPENAI_ENDPOINT – optional but if provided must be 'chat' or 'responses'
+    if (
+      typeof cfg.OPENAI_ENDPOINT !== 'undefined' &&
+      cfg.OPENAI_ENDPOINT !== 'chat' &&
+      cfg.OPENAI_ENDPOINT !== 'responses'
+    ) {
+      throw new Error('OPENAI_ENDPOINT, if provided, must be either "chat" or "responses".');
+    }
+
+    // OPENAI_MODEL_ID – optional but if provided must be non-empty string
+    if (
+      typeof cfg.OPENAI_MODEL_ID !== 'undefined' &&
+      (typeof cfg.OPENAI_MODEL_ID !== 'string' || cfg.OPENAI_MODEL_ID.trim() === '')
+    ) {
+      throw new Error('OPENAI_MODEL_ID, if provided, must be a non-empty string.');
+    }
+
+    // GEMINI_MODEL_ID – optional but if provided must be non-empty string
+    if (
+      typeof cfg.GEMINI_MODEL_ID !== 'undefined' &&
+      (typeof cfg.GEMINI_MODEL_ID !== 'string' || cfg.GEMINI_MODEL_ID.trim() === '')
+    ) {
+      throw new Error('GEMINI_MODEL_ID, if provided, must be a non-empty string.');
+    }
+
+    // RESPONSES_BETA – optional, must be boolean when provided
+    if (
+      typeof cfg.RESPONSES_BETA !== 'undefined' &&
+      typeof cfg.RESPONSES_BETA !== 'boolean'
+    ) {
+      throw new Error('RESPONSES_BETA, if provided, must be a boolean.');
     }
   }
 

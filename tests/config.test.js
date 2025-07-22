@@ -61,4 +61,39 @@ describe('validateConfig()', () => {
 
     expect(() => validateConfig(cfg)).not.toThrow();
   });
+
+  test('throws for invalid OPENAI_ENDPOINT value', () => {
+    const cfg = {
+      DOCUMENTATION_BASE_URL: 'https://docs.example.com',
+      PAGE_ANALYSIS_LIMIT: 10,
+      LLM_PROVIDER: 'openai',
+      OPENAI_API_KEY: 'sk-test',
+      OPENAI_ENDPOINT: 'invalid',
+    };
+
+    expect(() => validateConfig(cfg)).toThrow('OPENAI_ENDPOINT');
+  });
+
+  test('passes when new optional keys are omitted', () => {
+    const cfg = {
+      DOCUMENTATION_BASE_URL: 'https://docs.example.com',
+      PAGE_ANALYSIS_LIMIT: 20,
+      LLM_PROVIDER: 'gemini',
+      GEMINI_API_KEY: 'gem-test',
+    };
+
+    expect(() => validateConfig(cfg)).not.toThrow();
+  });
+
+  test('passes when OPENAI_ENDPOINT is "responses"', () => {
+    const cfg = {
+      DOCUMENTATION_BASE_URL: 'https://docs.example.com',
+      PAGE_ANALYSIS_LIMIT: 15,
+      LLM_PROVIDER: 'openai',
+      OPENAI_API_KEY: 'sk-test',
+      OPENAI_ENDPOINT: 'responses',
+    };
+
+    expect(() => validateConfig(cfg)).not.toThrow();
+  });
 });
