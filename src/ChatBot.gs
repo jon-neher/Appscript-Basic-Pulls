@@ -64,9 +64,99 @@ function onMessage(event) {
 
     const userText = event.message?.argumentText ?? event.message?.text ?? '';
 
-    // TODO(route): Replace this stubbed implementation with your actual
-    // processing pipeline (e.g. call to an LLM or database).
-    const responseText = `You said: "${userText.trim()}".`;
+    /* -------------------------------------------------------------------
+     * Thread understanding via LLM (VEN-8)
+     * ------------------------------------------------------------------- */
+    // Collect a sliding window of messages.  The Chat API does not expose a
+    // convenient "get thread" endpoint inside Apps Script, so for now we
+    // include **only** the current message plus the immediate parent if this
+    // message is part of a thread.  Expand this once the REST wrapper is in
+    // place.
+    /** @type {string[]} */
+    var threadMessages = [];
+    threadMessages.push(userText);
+
+    // Optionally include the quoted parent when present (Google Chat sends
+    // `message.threadReply` events that reference the parent message in
+    // `message.thread.replyMessage`).  The shape is undocumented for Apps
+    // Script; guard defensively.
+    if (event.message?.thread?.replyMessage?.text) {
+      threadMessages.unshift(event.message.thread.replyMessage.text);
+    }
+
+    // Call the cross-runtime wrapper.  The function is attached to the global
+    // scope by `src/llm/apiWrapper.js`, so we can reference it directly.
+    /** @type {Object} */
+    var llmAnalysis;
+    try {
+      llmAnalysis = sendThreadForUnderstanding(threadMessages);
+
+      // In the unlikely event this handler runs in an environment that
+      // returns a Promise (e.g. Node-based integration tests) we *blockingly*
+      // wait for resolution so the rest of the code can treat the result as a
+      // plain object.
+      if (llmAnalysis && typeof llmAnalysis.then === 'function') {
+        var resolved = false;
+        var error;
+        var value;
+        llmAnalysis
+          .then(function (v) {
+            resolved = true;
+            value = v;
+          })
+          .catch(function (err) {
+            resolved = true;
+            error = err;
+          });
+        // Yield CPU while waiting for the Promise to settle.  In production
+        // Apps Script this loop should rarely iterate because UrlFetchApp
+        // calls are synchronous, but defensive mocks in tests may return an
+        // unresolved Promise.  Sleeping prevents a tight spin-loop from
+        // consuming runtime quota.
+        while (!resolved) {
+          // Google Apps Script provides the `Utilities.sleep()` API which
+          // blocks the current thread but yields CPU back to the runtime so we
+          // don’t hog our execution quota.  When this code runs in other
+          // runtimes (e.g. Node inside Jest) the global `Utilities` object is
+          // *undefined* which would raise a ReferenceError.  Guard the call so
+          // tests keep running cross-runtime.
+
+          if (typeof Utilities !== 'undefined' && typeof Utilities.sleep === 'function') {
+            // Apps Script → cooperative blocking sleep.
+            Utilities.sleep(50); // ≈50 ms
+          } else if (typeof Atomics !== 'undefined' && typeof SharedArrayBuffer !== 'undefined') {
+            // Node / other JS → light blocking sleep using Atomics.wait().  This
+            // yields the event loop long enough for Promises to settle without
+            // introducing async/await into this synchronous handler.
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+          } else {
+            // Fallback – last resort tight spin (should be extremely rare).
+            var start = Date.now();
+            while (Date.now() - start < 50) {
+              /* noop */
+            }
+          }
+        }
+        if (error) throw error;
+        llmAnalysis = value;
+      }
+    } catch (analysisErr) {
+      console.error('Thread understanding failed', analysisErr, analysisErr.stack);
+      llmAnalysis = null;
+    }
+
+    // Build a user-friendly reply summarising the analysis.
+    var responseText;
+    if (llmAnalysis) {
+      responseText =
+        '*Topic:* ' + llmAnalysis.topic + '\n' +
+        '*Question type:* ' + llmAnalysis.questionType + '\n' +
+        '*Technical level:* ' + llmAnalysis.technicalLevel + '\n' +
+        '*Urgency:* ' + llmAnalysis.urgency + '\n' +
+        '*Key concepts:* ' + llmAnalysis.keyConcepts.join(', ');
+    } else {
+      responseText = `You said: "${userText.trim()}".`;
+    }
 
     return createResponse({
       text: responseText,

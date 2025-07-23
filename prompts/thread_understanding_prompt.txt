@@ -1,0 +1,23 @@
+You are an AI assistant tasked with understanding an entire conversation thread between knowledge-base users and a support bot.
+
+Instructions:
+1. Carefully read the full conversation provided below delimited by "---" lines.
+2. Think step-by-step about what the *main topic* of the discussion is.
+3. Determine whether the final user message is asking a *clarifying question*, *new question*, *follow-up*, *bug report*, or *other*.
+4. Assess the *technical level* of the user on a 4-point scale:
+    - 1 = Novice · 2 = Intermediate · 3 = Advanced · 4 = Expert
+5. Estimate the *urgency* on a scale of 0–100 where 0 = no urgency and 100 = critical/time-sensitive.
+6. List the five most important *key concepts* or entities that appear in the thread.
+
+Output **valid minified JSON** only, exactly in this shape:
+{
+   "topic":               string,
+   "questionType":        "clarifying" | "new" | "follow-up" | "bug" | "other",
+   "technicalLevel":      1 | 2 | 3 | 4,
+   "urgency":             number,           // integer 0–100
+   "keyConcepts":         string[]          // ≤ 10 items
+}
+
+---
+{{THREAD}}
+---
