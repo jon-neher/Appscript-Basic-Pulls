@@ -132,3 +132,8 @@
     module.exports = { parseRecommendationResponse };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// Re-export for ES module consumers.
+// @ts-ignore
+export const parseRecommendationResponse: (raw: string, sections: any[]) => any = (globalThis as any).parseRecommendationResponse;
+

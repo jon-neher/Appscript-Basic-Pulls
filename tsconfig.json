@@ -1,0 +1,14 @@
+{
+   "compilerOptions": {
+     "target": "es2020",
+     "module": "none",
+     "strict": true,
+     "noEmit": true,
+     "types": [
+       "google-apps-script"
+     ]
+   },
+   "include": [
+     "src/**/*"
+   ]
+}

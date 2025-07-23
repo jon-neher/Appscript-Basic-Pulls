@@ -293,3 +293,14 @@ function createResponse(params) {
 
   return response;
 }
+
+// Attach trigger handlers to the global object so that Apps Script can invoke
+// them directly when the bundle is executed.
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore – global assignment for GAS runtime.
+(globalThis as any).onMessage = onMessage;
+// @ts-ignore
+(globalThis as any).onSlashCommand = onSlashCommand;
+
+// Re-export for other TypeScript modules / esbuild entry point.
+export { onMessage, onSlashCommand };

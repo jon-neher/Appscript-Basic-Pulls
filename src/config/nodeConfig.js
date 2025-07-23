@@ -24,6 +24,16 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire, Module as NodeModule } from 'node:module';
 
+// ESM files do not have the CommonJS `require` global, but the Node APIs allow
+// us to create a **local** require bound to the current module URL. We re-use
+// it whenever we need to synchronously load CommonJS-only packages (like the
+// TypeScript compiler).
+const localRequire = createRequire(import.meta.url);
+
+// Cache for the heavy TypeScript compiler module so we only pay the import
+// cost once per Node process.
+let ts;
+
 /**
 * Compiles a CommonJS file at `filename` and returns the `module.exports`.
 *
@@ -31,7 +41,37 @@ import { createRequire, Module as NodeModule } from 'node:module';
 * @returns {*} The `exports` object produced by executing the file.
 */
 function compileCommonJs(filename) {
-  const code = fs.readFileSync(filename, 'utf8');
+  let code = fs.readFileSync(filename, 'utf8');
+
+  // If the file is TypeScript we transpile it to CommonJS using the
+  // TypeScript compiler API.  This avoids pulling in heavy runtime loaders
+  // like ts-node and keeps the logic self-contained.
+  if (filename.endsWith('.ts')) {
+    try {
+      // Lazily load the TypeScript compiler *once* and reuse the instance for
+      // subsequent compilations – this avoids the ~25 MB module cost on every
+      // invocation when running in long-lived processes like Jest in watch
+      // mode.
+      /* eslint-disable import/no-extraneous-dependencies */
+      if (!ts) {
+        ts = localRequire('typescript');
+      }
+      /* eslint-enable import/no-extraneous-dependencies */
+
+      const transpiled = ts.transpileModule(code, {
+        compilerOptions: {
+          target: 'ES2020',
+          module: 'CommonJS',
+          strict: true,
+          esModuleInterop: false,
+        },
+        fileName: filename,
+      });
+      code = transpiled.outputText;
+    } catch (err) {
+      throw new Error(`Failed to transpile TypeScript config ${filename}: ${err.message}`);
+    }
+  }
 
   // Create a fresh CommonJS `Module` instance detached from the normal module
   // graph.  The public `Module` constructor takes an `id` and an optional
@@ -90,14 +130,19 @@ function loadConfigModule() {
     return compileCommonJs(jsPath);
   }
 
+  const tsPath = path.resolve(__dirname, '../server/Config.ts');
+  if (fs.existsSync(tsPath)) {
+    return compileCommonJs(tsPath);
+  }
+
   const gsPath = path.resolve(__dirname, '../Config.gs');
   if (fs.existsSync(gsPath)) {
     return compileCommonJs(gsPath);
   }
 
-  throw new Error('Unable to locate Config.gs or Config.js next to nodeConfig.js');
+  throw new Error('Unable to locate Config.ts/.js/.gs next to nodeConfig.js');
 }
 
-const { CONFIG } = /** @type {{ CONFIG: any }} */ (loadConfigModule());
+const { CONFIG, validateConfig } = /** @type {{ CONFIG: any, validateConfig?: (cfg:any)=>void }} */ (loadConfigModule());
 
-export { CONFIG };
+export { CONFIG, validateConfig };

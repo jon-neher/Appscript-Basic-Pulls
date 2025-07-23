@@ -115,3 +115,31 @@ convert the chat history into a single prompt string and call the new
 endpoint.
 
 
+## TypeScript & esbuild build pipeline (2025-07)
+
+The Apps Script portion of the repo is now written in **TypeScript** and bundled
+with [esbuild](https://esbuild.github.io/) into a single `bundle.gs` file. The
+workflow is completely driven by npm scripts:
+
+| Script | What it does |
+| ------ | ------------ |
+| `npm run build`  | Executes esbuild (`build/esbuild.config.js`) then copies an updated manifest to `dist/`. |
+| `npm run watch`  | Same as build but starts esbuild in **watch** mode for sub-100 ms incremental rebuilds. |
+| `npm run deploy` | Runs the build and immediately `clasp push --rootDir dist`, ensuring only the bundled output is uploaded. |
+
+The `appsscript.json` manifest in `dist/` automatically sets:
+
+```json
+{
+  "rootDir": "dist",
+  "filePushOrder": ["bundle.gs", "appsscript.json"]
+}
+```
+
+so that Google’s clasp tool uploads your code first, followed by the manifest.
+
+> **Heads-up**: The original `.gs` files have been migrated to TypeScript under
+> `src/server/`. Tests now import the configuration through
+> `src/config/nodeConfig.js`, so `npm test` still works out-of-the-box.
+
+

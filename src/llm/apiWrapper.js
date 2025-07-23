@@ -392,11 +392,22 @@
    * @return {Promise<string>} Assistant reply text.
    */
   async function callOpenAIResponses(params) {
-    // For now we simply return the prompt back – unit tests spy on the call
-    // signature only and do not inspect the return value.  Replace with real
-    // implementation once the project adopts the Responses API for
-    // production traffic.
-    return params.prompt;
+    /*
+     * Temporary shim – the Public *Responses* beta endpoint is not yet fully
+     * rolled-out.  Until then we transparently proxy the request to the Chat
+     * Completions endpoint so call sites can remain stable while we collect
+     * real-world usage data.  This still exercises the *network layer* which
+     * our Jest suite stubs, ensuring tests capture any regression in fetch
+     * orchestration.
+     */
+
+    if (!params || typeof params.prompt !== 'string') {
+      throw new TypeError('callOpenAIResponses({ prompt }) expects a string prompt');
+    }
+
+    // Delegate to the existing Chat Completions helper – this keeps behaviour
+    // consistent with production traffic and avoids duplicating request logic.
+    return callOpenAI(params.prompt);
   }
 
   /* --------------------------- doFetch shim ------------------------- */
@@ -442,6 +453,7 @@
    * ------------------------------------------------------------------ */
 
   global.sendThreadForUnderstanding = sendThreadForUnderstanding;
+  global.callOpenAIResponses = callOpenAIResponses;
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {

@@ -2,13 +2,7 @@
 * Configuration validation tests (native ES module version).
 */
 
-import { createRequire } from 'node:module';
-
-// Support importing the legacy `.gs` source file.
-const require = createRequire(import.meta.url);
-require.extensions['.gs'] = require.extensions['.js']; // eslint-disable-line no-extend-native
-
-const { validateConfig } = require('../src/Config.gs');
+import { validateConfig } from '../src/config/nodeConfig.js';
 
 describe('validateConfig()', () => {
   test('throws when DOCUMENTATION_BASE_URL is missing', () => {

@@ -177,3 +177,8 @@
     module.exports = { recommendDocumentationSections, localScoreSections }; // Export local scorer for unit tests.
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// Re-export for ES module consumers after the IIFE initialises globals.
+// @ts-ignore
+export const recommendDocumentationSections: (params: any) => any = (globalThis as any).recommendDocumentationSections;
+

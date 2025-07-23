@@ -103,6 +103,7 @@ Answer:
     return `You are a technical writer helping maintain a public knowledge base.\n\n${FEW_SHOT_EXAMPLES}\n\n### Live query\nContext:\n"${context.trim()}"\n\nCandidate sections:\n${formattedSections}\n\nAnswer:\n`; // Trailing newline gives the model space to start generating.
   }
 
+
   // Attach to global (Apps Script).
   // eslint-disable-next-line no-param-reassign
   global.buildRecommendationPrompt = buildRecommendationPrompt;
@@ -112,3 +113,8 @@ Answer:
     module.exports = { buildRecommendationPrompt, FEW_SHOT_EXAMPLES };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// Re-export for module consumers.
+// @ts-ignore
+export const buildRecommendationPrompt: (params: any) => string = (globalThis as any).buildRecommendationPrompt;
+

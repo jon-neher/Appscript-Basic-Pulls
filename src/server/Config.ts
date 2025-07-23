@@ -141,8 +141,21 @@
   // eslint-disable-next-line no-param-reassign
   global.CONFIG = CONFIG;
 
+  // Expose the validator too so that downstream TypeScript modules can import
+  // it without relying on CommonJS interop.
+  // eslint-disable-next-line no-param-reassign
+  global.validateConfig = validateConfig;
+
   // Export for Node/Jest if the CommonJS `module` global exists.
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { CONFIG, validateConfig };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// Re-export for ES module consumers.
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore – global attachment ensured by the IIFE above.
+export const CONFIG: Readonly<any> = (globalThis as any).CONFIG;
+// @ts-ignore
+export const validateConfig: (cfg: any) => void = (globalThis as any).validateConfig;
+
