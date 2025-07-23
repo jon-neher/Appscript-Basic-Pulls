@@ -10,10 +10,14 @@
     "pull": "clasp pull",
     "deploy": "clasp deploy --description \"Deploy from CI\"",
     "open": "clasp open",
-    "test": "jest --runInBand"
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand"
+    ,
+    "analyse": "node bin/crawl-and-analyse.js"
   },
   "dependencies": {
-    "@google/clasp": "3.0.6-alpha"
+    "@google/clasp": "3.0.6-alpha",
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.12"
   },
   "devDependencies": {
     "jest": "^29.7.0",
@@ -24,7 +28,8 @@
     "moduleFileExtensions": [
       "js",
       "json",
-      "gs"
+      "gs",
+      "mjs"
     ]
   }
 }

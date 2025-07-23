@@ -1,8 +1,11 @@
 /**
-* Unit tests for the simplified Apps Script configuration module.
+* Configuration validation tests (native ES module version).
 */
 
-// Tell Node how to handle ".gs" files (treat them like plain JS).
+import { createRequire } from 'node:module';
+
+// Support importing the legacy `.gs` source file.
+const require = createRequire(import.meta.url);
 require.extensions['.gs'] = require.extensions['.js']; // eslint-disable-line no-extend-native
 
 const { validateConfig } = require('../src/Config.gs');
