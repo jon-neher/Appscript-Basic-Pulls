@@ -143,3 +143,9 @@ so that Google’s clasp tool uploads your code first, followed by the manifest.
 > `src/config/nodeConfig.js`, so `npm test` still works out-of-the-box.
 
 
+## Architecture & UX Patterns
+
+- [Ack → Action Flow](docs/ack-action-flow.md)
+
+
+
