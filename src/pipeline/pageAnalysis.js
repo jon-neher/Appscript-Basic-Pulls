@@ -11,8 +11,9 @@ const vectorStore = new FileVectorStore();
 *
 * @param {string} pageId Stable identifier (slug/path) – used as PK.
 * @param {string} absoluteUrl Full URL to the page.
+* @param {string=} siteId Documentation site identifier.  Defaults to `'default'`.
 */
-export async function analysePage(pageId, absoluteUrl) {
+export async function analysePage(pageId, absoluteUrl, siteId = 'default') {
   const rawHtml = await fetchPage(absoluteUrl);
   const cleaned = cleanHtml(rawHtml);
 
@@ -21,10 +22,14 @@ export async function analysePage(pageId, absoluteUrl) {
     summarizeText(cleaned),
   ]);
 
-  await vectorStore.upsert(pageId, vector, {
+  // Namespace the vector by site to avoid collisions across multi-site setups.
+  const vectorKey = `${siteId}:${pageId}`;
+
+  await vectorStore.upsert(vectorKey, vector, {
     url: absoluteUrl,
     summary,
     model: 'openai',
+    siteId,
     updatedAt: new Date().toISOString(),
   });
 

@@ -15,8 +15,19 @@
 *
 * @typedef {'openai' | 'gemini'} LlmProvider
 *
+* @typedef {Object} DocumentationSite
+* @property {string} id Unique identifier (slug) –
+*   must be URL/filename safe and unique across sites.
+* @property {string} type Human-readable label (eg. "developer docs").
+* @property {('public'|'internal')} visibility
+* @property {string[]} categories Supported content categories (eg. "api-reference").
+* @property {Record<string, any>=} overrides Optional map of per-site customization flags.
+*
 * @typedef {Object} AppConfig
-* @property {string} DOCUMENTATION_BASE_URL Absolute base URL of the public documentation site.
+* @property {string=} DOCUMENTATION_BASE_URL (Deprecated) – single-site URL kept
+*   for backward compatibility.  Prefer `DOCUMENTATION_SITES`.
+* @property {DocumentationSite[]=} DOCUMENTATION_SITES
+*   List of documentation sites available to the team.
 * @property {number} PAGE_ANALYSIS_LIMIT Max number of pages the crawler will analyse (1-1000).
 * @property {LlmProvider} LLM_PROVIDER Which LLM backend to use.
 * @property {string=} OPENAI_API_KEY Secret key for OpenAI – required iff `LLM_PROVIDER === 'openai'`.
@@ -40,8 +51,19 @@
    * @type {Readonly<AppConfig>}
    */
   const CONFIG = Object.freeze({
-    // Required – absolute URL starting with http(s)://
+    // DEPRECATED – single site.  Remains for compatibility but will be
+    // removed once all call-sites migrate to `DOCUMENTATION_SITES`.
     DOCUMENTATION_BASE_URL: 'https://docs.example.com',
+
+    // New multi-site configuration.  Minimum of one entry required.
+    DOCUMENTATION_SITES: [
+      {
+        id: 'dev-docs',
+        type: 'developer docs',
+        visibility: 'public',
+        categories: ['api-reference', 'tutorial', 'troubleshooting'],
+      },
+    ],
 
     // Required – integer 1-1000 inclusive
     PAGE_ANALYSIS_LIMIT: 50,
@@ -70,12 +92,47 @@
    */
   function validateConfig(cfg) {
     // DOCUMENTATION_BASE_URL – required, must start with http:// or https://
-    if (!cfg.DOCUMENTATION_BASE_URL || typeof cfg.DOCUMENTATION_BASE_URL !== 'string') {
-      throw new Error('DOCUMENTATION_BASE_URL is required and must be a string.');
+    if (cfg.DOCUMENTATION_BASE_URL) {
+      if (typeof cfg.DOCUMENTATION_BASE_URL !== 'string') {
+        throw new Error('DOCUMENTATION_BASE_URL must be a string.');
+      }
+      if (!/^https?:\/\//i.test(cfg.DOCUMENTATION_BASE_URL)) {
+        throw new Error('DOCUMENTATION_BASE_URL must start with "http://" or "https://".');
+      }
     }
-    if (!/^https?:\/\//i.test(cfg.DOCUMENTATION_BASE_URL)) {
-      throw new Error('DOCUMENTATION_BASE_URL must start with "http://" or "https://".');
+
+    // DOCUMENTATION_SITES – new multi-site support (required >= 1).
+    if (!Array.isArray(cfg.DOCUMENTATION_SITES) || cfg.DOCUMENTATION_SITES.length === 0) {
+      throw new Error('At least one entry in DOCUMENTATION_SITES is required.');
     }
+
+    const seenIds = new Set();
+    cfg.DOCUMENTATION_SITES.forEach((site, idx) => {
+      if (!site || typeof site !== 'object') {
+        throw new Error(`DOCUMENTATION_SITES[${idx}] must be an object.`);
+      }
+      const { id, type, visibility, categories } = site;
+
+      if (!id || typeof id !== 'string') {
+        throw new Error(`DOCUMENTATION_SITES[${idx}].id is required and must be a string.`);
+      }
+      if (seenIds.has(id)) {
+        throw new Error(`Duplicate site id "${id}" in DOCUMENTATION_SITES.`);
+      }
+      seenIds.add(id);
+
+      if (!type || typeof type !== 'string') {
+        throw new Error(`DOCUMENTATION_SITES[${idx}].type is required and must be a string.`);
+      }
+
+      if (visibility !== 'public' && visibility !== 'internal') {
+        throw new Error(`DOCUMENTATION_SITES[${idx}].visibility must be "public" or "internal".`);
+      }
+
+      if (!Array.isArray(categories) || categories.length === 0) {
+        throw new Error(`DOCUMENTATION_SITES[${idx}].categories must be a non-empty array.`);
+      }
+    });
 
     // PAGE_ANALYSIS_LIMIT – required integer 1-1000
     if (
