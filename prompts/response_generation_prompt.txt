@@ -1,0 +1,32 @@
+Generate a helpful, context-aware response based on the information below.
+
+ORIGINAL CONVERSATION:
+
+{{ORIGINAL_MESSAGES}}
+
+ANALYSIS RESULTS:
+
+{{LLM_ANALYSIS}}
+
+RECOMMENDATIONS:
+
+{{LLM_RECOMMENDATIONS}}
+
+TEAM CONTEXT (if available):
+
+{{TEAM_CONTEXT}}
+
+CONVERSATION MEMORY:
+
+{{CONVERSATION_MEMORY}}
+
+Create a response that:
+
+* Matches the conversation tone and formality level
+* Provides specific, actionable guidance including concrete examples
+* References relevant existing documentation (quote or link where helpful)
+* Explains the reasoning in clear terms the team will understand
+* Suggests personalized next steps tailored to the team’s workflow
+* Addresses any concerns or constraints that were mentioned
+
+Response format: Natural conversation style, not a rigid template.
