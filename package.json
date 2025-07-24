@@ -13,13 +13,14 @@
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
     "build": "node build/esbuild.config.js && node build/copyManifest.mjs",
     "watch": "node build/esbuild.config.js --watch",
-    "deploy": "npm run build && clasp push --rootDir dist"
-    ,
+    "deploy": "npm run build && clasp push --rootDir dist",
     "analyse": "node bin/crawl-and-analyse.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
-    "cheerio": "^1.0.0-rc.12"
+    "cheerio": "^1.0.0-rc.12",
+    "undici": "^6.21.3",
+    "p-map": "^6.0.0"
   },
   "devDependencies": {
     "@google/clasp": "3.0.6-alpha",
