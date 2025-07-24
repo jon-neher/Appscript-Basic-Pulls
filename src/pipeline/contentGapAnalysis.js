@@ -33,6 +33,7 @@ import axios from 'axios';
 import { embedText } from './embedText.js';
 import { vectorStore as docVectorStore } from './pageAnalysis.js';
 import { CONFIG } from '../config/nodeConfig.js';
+import { cosineSimilarity } from '../utils/math.js';
 
 // ---------------------------------------------------------------------------
 // Constants & configurable defaults
@@ -57,25 +58,9 @@ const DEFAULTS = {
 };
 
 // ---------------------------------------------------------------------------
-// Helper – cosine similarity (duplicated here to avoid fragile imports)
+// Helper – cosine similarity is now imported from `src/utils/math.js` to
+// ensure a single implementation is used across the code-base.
 // ---------------------------------------------------------------------------
-
-function cosineSimilarity(a, b) {
-  if (a.length !== b.length) throw new Error('Vector length mismatch');
-
-  let dot = 0;
-  let magA = 0;
-  let magB = 0;
-
-  for (let i = 0; i < a.length; i += 1) {
-    dot += a[i] * b[i];
-    magA += a[i] ** 2;
-    magB += b[i] ** 2;
-  }
-
-  const denom = Math.sqrt(magA) * Math.sqrt(magB);
-  return denom === 0 ? 0 : dot / denom;
-}
 
 // ---------------------------------------------------------------------------
 // Helper – slugification for stable IDs

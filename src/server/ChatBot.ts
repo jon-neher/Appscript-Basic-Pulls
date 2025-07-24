@@ -42,7 +42,6 @@
 */
 function onMessage(event) {
   try {
-    // Basic sanity check – only process MESSAGE events.
     if (event.type !== 'MESSAGE') {
       console.info('Ignoring non-MESSAGE event', event.type);
       return;
@@ -50,13 +49,10 @@ function onMessage(event) {
 
     console.info('Incoming MESSAGE event', JSON.stringify(event));
 
-    // If the message is a slash-command invocation, hand off to the
-    // dedicated handler.
     if (event.message && event.message.slashCommand) {
       return onSlashCommand(event);
     }
 
-    // Filter out messages we shouldn’t react to.
     if (!shouldProcessMessage(event)) {
       console.info('Message skipped – did not meet processing criteria');
       return;
@@ -64,112 +60,150 @@ function onMessage(event) {
 
     const userText = event.message?.argumentText ?? event.message?.text ?? '';
 
-    /* -------------------------------------------------------------------
-     * Thread understanding via LLM (VEN-8)
-     * ------------------------------------------------------------------- */
-    // Collect a sliding window of messages.  The Chat API does not expose a
-    // convenient "get thread" endpoint inside Apps Script, so for now we
-    // include **only** the current message plus the immediate parent if this
-    // message is part of a thread.  Expand this once the REST wrapper is in
-    // place.
-    /** @type {string[]} */
-    var threadMessages = [];
-    threadMessages.push(userText);
+    // -------------------------------------------------------------------
+    // Thread understanding via LLM (VEN-8)
+    // -------------------------------------------------------------------
 
-    // Optionally include the quoted parent when present (Google Chat sends
-    // `message.threadReply` events that reference the parent message in
-    // `message.thread.replyMessage`).  The shape is undocumented for Apps
-    // Script; guard defensively.
-    if (event.message?.thread?.replyMessage?.text) {
-      threadMessages.unshift(event.message.thread.replyMessage.text);
-    }
+    const threadMessages = collectThreadMessages(event, userText);
 
-    // Call the cross-runtime wrapper.  The function is attached to the global
-    // scope by `src/llm/apiWrapper.js`, so we can reference it directly.
-    /** @type {Object} */
-    var llmAnalysis;
+    let llmAnalysis;
     try {
       llmAnalysis = sendThreadForUnderstanding(threadMessages);
 
-      // In the unlikely event this handler runs in an environment that
-      // returns a Promise (e.g. Node-based integration tests) we *blockingly*
-      // wait for resolution so the rest of the code can treat the result as a
-      // plain object.
+      // Some test environments stub the wrapper with an async function. We
+      // synchronously resolve the promise so the rest of the handler can stay
+      // sync-friendly for Apps Script.
       if (llmAnalysis && typeof llmAnalysis.then === 'function') {
-        var resolved = false;
-        var error;
-        var value;
-        llmAnalysis
-          .then(function (v) {
-            resolved = true;
-            value = v;
-          })
-          .catch(function (err) {
-            resolved = true;
-            error = err;
-          });
-        // Yield CPU while waiting for the Promise to settle.  In production
-        // Apps Script this loop should rarely iterate because UrlFetchApp
-        // calls are synchronous, but defensive mocks in tests may return an
-        // unresolved Promise.  Sleeping prevents a tight spin-loop from
-        // consuming runtime quota.
-        while (!resolved) {
-          // Google Apps Script provides the `Utilities.sleep()` API which
-          // blocks the current thread but yields CPU back to the runtime so we
-          // don’t hog our execution quota.  When this code runs in other
-          // runtimes (e.g. Node inside Jest) the global `Utilities` object is
-          // *undefined* which would raise a ReferenceError.  Guard the call so
-          // tests keep running cross-runtime.
-
-          if (typeof Utilities !== 'undefined' && typeof Utilities.sleep === 'function') {
-            // Apps Script → cooperative blocking sleep.
-            Utilities.sleep(50); // ≈50 ms
-          } else if (typeof Atomics !== 'undefined' && typeof SharedArrayBuffer !== 'undefined') {
-            // Node / other JS → light blocking sleep using Atomics.wait().  This
-            // yields the event loop long enough for Promises to settle without
-            // introducing async/await into this synchronous handler.
-            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
-          } else {
-            // Fallback – last resort tight spin (should be extremely rare).
-            var start = Date.now();
-            while (Date.now() - start < 50) {
-              /* noop */
-            }
-          }
-        }
-        if (error) throw error;
-        llmAnalysis = value;
+        llmAnalysis = resolvePromiseSync(llmAnalysis);
       }
     } catch (analysisErr) {
       console.error('Thread understanding failed', analysisErr, analysisErr.stack);
       llmAnalysis = null;
     }
 
-    // Build a user-friendly reply summarising the analysis.
-    var responseText;
-    if (llmAnalysis) {
-      responseText =
-        '*Topic:* ' + llmAnalysis.topic + '\n' +
-        '*Question type:* ' + llmAnalysis.questionType + '\n' +
-        '*Technical level:* ' + llmAnalysis.technicalLevel + '\n' +
-        '*Urgency:* ' + llmAnalysis.urgency + '\n' +
-        '*Key concepts:* ' + llmAnalysis.keyConcepts.join(', ');
-    } else {
-      responseText = `You said: "${userText.trim()}".`;
-    }
+    const responseText = llmAnalysis
+      ? [
+          `*Topic:* ${llmAnalysis.topic}`,
+          `*Question type:* ${llmAnalysis.questionType}`,
+          `*Technical level:* ${llmAnalysis.technicalLevel}`,
+          `*Urgency:* ${llmAnalysis.urgency}`,
+          `*Key concepts:* ${llmAnalysis.keyConcepts.join(', ')}`,
+        ].join('\n')
+      : `You said: "${userText.trim()}".`;
 
-    return createResponse({
-      text: responseText,
-      event,
-    });
+    return createResponse({ text: responseText, event });
   } catch (err) {
-    // Log stack for debugging and send a generic error to the user.
     console.error('onMessage error', err, err.stack);
     return createResponse({
       text: 'Sorry – something went wrong processing your message.',
       event,
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Extracted helpers – keep the main handler readable.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Shared sleep buffer – reused by resolvePromiseSync().
+// ---------------------------------------------------------------------------
+
+// Apps Script (and many JS runtimes) expose Atomics & SharedArrayBuffer which
+// allow a cooperative, blocking sleep without a tight busy-wait.  Creating a
+// **new** SharedArrayBuffer on every 50 ms tick however quickly balloons into
+// thousands of tiny allocations during a long wait.  We allocate a single
+// 4-byte buffer at module scope and reuse its Int32Array view for every
+// `Atomics.wait()` call.
+
+const _sleepSab: SharedArrayBuffer | undefined =
+  typeof SharedArrayBuffer !== 'undefined' && typeof Atomics !== 'undefined'
+    ? new SharedArrayBuffer(4)
+    : undefined;
+// The typed view is undefined when SharedArrayBuffer is unavailable so that
+// the branch in `sleep()` can simply check for truthiness.
+const _sleepI32: Int32Array | undefined = _sleepSab
+  ? new Int32Array(_sleepSab)
+  : undefined;
+
+/**
+* Builds the `threadMessages` array used by the LLM analysis wrapper.
+*
+* @param {*} event Google Chat event.
+* @param {string} userText Current user message text (already extracted).
+* @returns {string[]} Ordered list of messages (oldest → newest).
+*/
+function collectThreadMessages(event, userText) {
+  /** @type {string[]} */
+  const messages = [userText];
+
+  if (event.message?.thread?.replyMessage?.text) {
+    messages.unshift(event.message.thread.replyMessage.text);
+  }
+
+  return messages;
+}
+
+/**
+* Synchronously resolves a Promise in environments (like Jest) where the
+* cross-runtime wrapper returns one. Uses environment-specific methods to
+* yield execution without blocking CPU where possible.
+*
+* @template T
+* @param {Promise<T>} promise
+* @returns {T}
+* @throws {*} Re-throws the original rejection reason if the promise rejects.
+*/
+function resolvePromiseSync(promise) {
+  let resolved = false;
+  let value;
+  let error;
+
+  promise
+    .then((v) => {
+      resolved = true;
+      value = v;
+    })
+    .catch((err) => {
+      resolved = true;
+      error = err;
+    });
+
+  // Busy-wait with cooperative sleeps to avoid burning CPU. Uses the reusable
+  // SharedArrayBuffer view declared at module scope when available.
+  const sleep = () => {
+    if (
+      typeof Utilities !== 'undefined' &&
+      typeof Utilities.sleep === 'function'
+    ) {
+      // Apps Script – cooperative scheduler-friendly sleep.
+      Utilities.sleep(50);
+    } else if (_sleepI32) {
+      // Node + many runtimes – block via Atomics.wait on a shared buffer.
+      Atomics.wait(_sleepI32, 0, 0, 50);
+    } else {
+      // Fallback – busy-wait loop (worst-case but universally supported).
+      const start = Date.now();
+      while (Date.now() - start < 50) {
+        /* noop */
+      }
+    }
+  };
+
+  // Absolute deadline (30 s safety net) to avoid hanging forever if the
+  // promise never settles – e.g. faulty stub in a Jest test.
+  const deadline = Date.now() + 30_000; // 30 seconds
+
+  // Loop until the promise settles *or* we hit the safety timeout.
+  while (!resolved) {
+    if (Date.now() > deadline) {
+      throw new Error('Timed out waiting for Promise to settle (30 s)');
+    }
+    sleep();
+  }
+
+  if (error) throw error;
+  return value;
 }
 
 /**

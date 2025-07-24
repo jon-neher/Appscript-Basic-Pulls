@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { VectorStore } from './VectorStore.js';
+import { cosineSimilarity } from '../utils/math.js';
 
 const DEFAULT_FILENAME = path.resolve('data', 'embeddings.json');
 
@@ -139,23 +140,4 @@ export class FileVectorStore extends VectorStore {
     // Higher score = closer similarity.
     return results.sort((a, b) => b.score - a.score).slice(0, k);
   }
-}
-
-// ---- helpers ----
-
-function cosineSimilarity(a, b) {
-  if (a.length !== b.length) throw new Error('Vector length mismatch');
-
-  let dot = 0;
-  let magA = 0;
-  let magB = 0;
-
-  for (let i = 0; i < a.length; i += 1) {
-    dot += a[i] * b[i];
-    magA += a[i] ** 2;
-    magB += b[i] ** 2;
-  }
-
-  const denom = Math.sqrt(magA) * Math.sqrt(magB);
-  return denom === 0 ? 0 : dot / denom;
 }
