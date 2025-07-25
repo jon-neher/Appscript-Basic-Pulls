@@ -3,7 +3,7 @@ import * as nock from 'nock';
 import { onMessage } from '../src/server/ChatBot';
 
 
-describe('ChatBot.onMessage – AI reply generation', () => {
+describe('ChatBot.onMessage - AI reply generation', () => {
   const chatBase = 'https://chat.googleapis.com';
   const threadPath = '/v1/spaces/AAA/threads/BBB/messages';
 

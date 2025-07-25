@@ -142,7 +142,7 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown>> {
     return createResponse({ text: aiReply });
   } catch (err) {
     console.error('onMessage AI reply error', err);
-    return createResponse({ text: 'Sorry — I encountered an error while replying.' });
+    return createResponse({ text: 'Sorry - I encountered an error while replying.' });
   }
 }
 
