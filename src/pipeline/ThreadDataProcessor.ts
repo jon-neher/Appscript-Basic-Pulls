@@ -94,7 +94,11 @@ export function serialiseThreadKnowledgeMarkdown(data: ThreadKnowledgeData): str
     if (Number.isNaN(d.getTime())) return iso;
 
     // Year-month-day hour:minute in UTC for determinism.
-    return d.toISOString().replace(/T(\d{2}:\d{2}):\d{2}\.\d+Z$/, ' $1');
+    // Using slice avoids fragile regexes that might fail on ISO strings without
+    // fractional seconds or with timezone offsets. `toISOString()` always
+    // yields `YYYY-MM-DDTHH:mm:ss.sssZ`, so slicing the first 16 chars gives
+    // `YYYY-MM-DDTHH:mm`. We then replace the `T` with a space.
+    return d.toISOString().slice(0, 16).replace('T', ' ');
   };
 
   // Original question
