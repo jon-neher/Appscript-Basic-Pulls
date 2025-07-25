@@ -197,8 +197,9 @@ async function openaiGenerateText(
   const modelId =
     opts.modelId || readConfig('OPENAI_MODEL_ID') || DEFAULT_MODELS.openai;
 
-  const temperature =
-    typeof opts.temperature === 'number' ? opts.temperature : 0.7;
+  // Clamp temperature to OpenAI's accepted 0–2 range to avoid 400 errors.
+  const rawTemp = typeof opts.temperature === 'number' ? opts.temperature : 0.7;
+  const temperature = Math.min(Math.max(rawTemp, 0), 2);
 
   // Clamp maxTokens to provider/model limits.
   const requestedMax =
