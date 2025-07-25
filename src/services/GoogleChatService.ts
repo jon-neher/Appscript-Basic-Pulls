@@ -100,9 +100,13 @@ function isAiBotSender(sender: any): boolean {
     botDisplayName = props?.getProperty?.('AI_BOT_DISPLAY_NAME') as string | undefined;
   }
 
-  // Fallback to env vars for Node/tests
-  botUserId = botUserId || process.env.AI_BOT_USER_ID;
-  botDisplayName = botDisplayName || process.env.AI_BOT_DISPLAY_NAME;
+  // Fallback to env vars for Node/tests – guard access in case `process` is
+  // undefined (e.g. Apps Script runtime). Accessing `process` unconditionally
+  // would throw a ReferenceError in that environment.
+  if (typeof process !== 'undefined') {
+    botUserId = botUserId || process.env.AI_BOT_USER_ID;
+    botDisplayName = botDisplayName || process.env.AI_BOT_DISPLAY_NAME;
+  }
 
   return (
     (!!botUserId && sender.name === botUserId) ||
