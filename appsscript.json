@@ -18,6 +18,12 @@
         "commandId": 1,
         "displayName": "Ask a question",
         "runFunction": "onMessage"
+      },
+      {
+        "commandId": "capture-knowledge",
+        "triggers": ["MESSAGE"],
+        "description": "Capture the current thread's context for knowledge base indexing",
+        "runFunction": "onSlashCommand"
       }
     ],
     "postInstallationPrompt": {
