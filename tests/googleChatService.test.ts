@@ -1,7 +1,6 @@
-// This test file targets Node.js runtime – include Node type defs.
-// Declare Node globals for TypeScript without bringing in full @types/node dep
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const process: any;
+// Node.js globals like `process` are provided by `@types/node`, which is already
+// included in devDependencies via Jest's `tsconfig`. No manual declaration
+// override is needed here.
 
 import * as nock from 'nock';
 
