@@ -36,55 +36,57 @@ declare const PropertiesService: {
 } | undefined;
 
 // ---------------------------------------------------------------------------
-// Module-scope cache for GAS `Script Properties`
+// Internal helpers – cache Apps Script look-ups to minimise quota usage
 // ---------------------------------------------------------------------------
 
-/*
-* Repeated calls to `PropertiesService.getScriptProperties()` incur a quota
-* cost on Apps Script. Because script-properties are effectively immutable at
-* runtime we can safely cache the handle for the lifetime of this module.
+/**
+* Cached reference to the mutable-looking but effectively immutable
+* `ScriptProperties` store. Populated lazily on first access so the cost of
+* the GAS API call is paid only once per execution context.
 */
-
-let cachedScriptProperties: { getProperty(key: string): string | null } | null = null;
+let cachedScriptProperties:
+  | { getProperty(key: string): string | null }
+  | undefined
+  | null = null;
 
 /**
-* Read a key from GAS script properties, with lazy initialisation + caching.
+* Read a single key from Apps Script `Script Properties` with internal
+* caching and robust guards so the bundle continues to run in non-GAS
+* runtimes (Node/Jest).
 *
-* When executed in a non-GAS runtime (`PropertiesService` undefined) the
-* function returns `undefined` without side-effects.
-*
-* Any unexpected runtime errors (quota issues, etc.) are not swallowed – they
-* are surfaced via `console.warn()` so that callers have a breadcrumb while
-* still allowing execution to continue with fallback logic.
+* @param key – property name to retrieve
+* @returns the string value when present; `undefined` otherwise
 */
 function readFromScriptProperties(key: string): string | undefined {
-  try {
-    // Detect non-GAS runtimes first to avoid the `ReferenceError` thrown when
-    // merely *accessing* an undefined global.
-    if (typeof PropertiesService === 'undefined' || !PropertiesService?.getScriptProperties) {
+  // Fast-exit in environments where GAS globals are unavailable.
+  if (typeof PropertiesService === 'undefined') return undefined;
+
+  // Lazily initialises (and hence caches) the properties handle.
+  if (!cachedScriptProperties) {
+    try {
+      if (PropertiesService?.getScriptProperties) {
+        cachedScriptProperties = PropertiesService.getScriptProperties();
+      }
+    } catch (err) {
+      // The only *expected* failure here is a missing global which is already
+      // guarded against. Any other failure is unexpected and should be
+      // surfaced to aid debugging.
+      if (!(err instanceof ReferenceError)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          'readFromScriptProperties(): unexpected error initialising Script Properties',
+          err,
+        );
+      }
       return undefined;
     }
-
-    // Lazily initialise & cache the script-properties service.
-    if (!cachedScriptProperties) {
-      cachedScriptProperties = PropertiesService.getScriptProperties();
-    }
-
-    return cachedScriptProperties.getProperty(key) ?? undefined;
-  } catch (err) {
-    // Suppress the expected ReferenceError raised when the code is bundled for
-    // Node/Jest (no `PropertiesService` global). Surface everything else.
-    if (err instanceof ReferenceError) {
-      return undefined;
-    }
-
-    // eslint-disable-next-line no-console
-    console.warn(
-      'getConfig(): unexpected error while reading Script Properties – proceeding with fallback',
-      err,
-    );
-    return undefined;
   }
+
+  // If we still do not have a handle something went wrong; silently return
+  // undefined to preserve prior behaviour.
+  if (!cachedScriptProperties) return undefined;
+
+  return cachedScriptProperties.getProperty(key) ?? undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -127,13 +129,30 @@ export function getConfig(key: string, opts: GetConfigOptions = {}): string | un
   let val: string | undefined;
 
   // 1) Node / browser-like environment where `process` is defined
-  if (typeof process !== 'undefined' && (process as any)?.env && key in (process as any).env) {
+  if (
+    typeof process !== 'undefined' &&
+    (process as any)?.env &&
+    key in (process as any).env
+  ) {
     val = (process as any).env[key] as string | undefined;
   }
 
-  // 2) Apps Script – only when value still unresolved / empty.
+  // 2) Apps Script – fetch from Script Properties using the cached helper.
   if (val === undefined || val === '') {
-    val = readFromScriptProperties(key);
+    try {
+      val = readFromScriptProperties(key);
+    } catch (err) {
+      // Suppress the *expected* ReferenceError when the GAS global is absent
+      // (e.g. running under Node). Any other error is surfaced to logs to aid
+      // debugging while still preserving previous swallow-behaviour.
+      if (!(err instanceof ReferenceError)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          'getConfig(): unexpected error while reading Script Properties',
+          err,
+        );
+      }
+    }
   }
 
   // 3) Fallback literal
@@ -145,7 +164,8 @@ export function getConfig(key: string, opts: GetConfigOptions = {}): string | un
   if (val !== undefined && validate) {
     const result = validate(val);
     if (result !== true) {
-      const msg = typeof result === 'string' ? result : `Invalid value for config key "${key}"`;
+      const msg =
+        typeof result === 'string' ? result : `Invalid value for config key "${key}"`;
       throw new Error(msg);
     }
   }
