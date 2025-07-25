@@ -17,13 +17,13 @@
     "analyse": "node bin/crawl-and-analyse.js"
   },
   "dependencies": {
-    "@google/clasp": "3.0.6-alpha",
     "axios": "^1.6.0",
     "cheerio": "^1.0.0-rc.12",
     "undici": "^6.21.3",
     "p-map": "^6.0.0"
   },
   "devDependencies": {
+    "@google/clasp": "^2.5.0",
     "@types/google-apps-script": "^1.0.59",
     "esbuild": "^0.21.0",
     "esbuild-gas-plugin": "^0.5.0",
