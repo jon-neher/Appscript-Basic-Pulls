@@ -24,8 +24,8 @@ Options:
   -h, --help                Show this message and exit.
 
 The script assumes:
-  • you already ran "npm run login" _or_ exported GOOGLE_APPLICATION_CREDENTIALS.
-  • the Apps Script project is linked to the provided GCP project number.
+  - you already ran "npm run login" _or_ exported GOOGLE_APPLICATION_CREDENTIALS.
+  - the Apps Script project is linked to the provided GCP project number.
 EOF
 }
 
@@ -48,71 +48,71 @@ done
 
 # Sanity checks --------------------------------------------------------------
 
-command -v node >/dev/null || { echo "❌ Node.js is not installed" >&2; exit 1; }
-command -v npm  >/dev/null || { echo "❌ npm is not installed"  >&2; exit 1; }
-command -v clasp >/dev/null || { echo "❌ clasp CLI is not installed (npm i -g @google/clasp)" >&2; exit 1; }
+command -v node >/dev/null || { echo "ERROR: Node.js is not installed" >&2; exit 1; }
+command -v npm  >/dev/null || { echo "ERROR: npm is not installed"  >&2; exit 1; }
+command -v clasp >/dev/null || { echo "ERROR: clasp CLI is not installed (npm i -g @google/clasp)" >&2; exit 1; }
 
 if [[ ! -f package.json ]]; then
-  echo "❌ Run the script from the repository root" >&2; exit 1;
+  echo "ERROR: run the script from the repository root" >&2; exit 1;
 fi
 
 # Verify login – `clasp status` fails with code 1 when not authenticated.
 if ! clasp status >/dev/null 2>&1; then
-  echo "❌ clasp is not authenticated. Run 'npm run login' first." >&2
+  echo "ERROR: clasp is not authenticated. Run 'npm run login' first." >&2
   exit 1
 fi
 
 # Step 1 – Install deps (skipped when node_modules exists) --------------------
 
 if [[ ! -d node_modules ]]; then
-  echo "📦 Installing npm dependencies…" >&2
+  echo "Installing npm dependencies..." >&2
   npm install
 fi
 
 # Step 2 – Build --------------------------------------------------------------
 
-echo "🔨 Building Apps Script bundle…" >&2
+echo "Building Apps Script bundle..." >&2
 npm run build
 
 # Step 3 – Push to Apps Script ------------------------------------------------
 
-echo "🚀 Pushing $ROOT_DIR to Apps Script…" >&2
+echo "Pushing $ROOT_DIR to Apps Script..." >&2
 clasp push --rootDir "$ROOT_DIR"
 
 # Step 4 – (Optional) Link to Cloud project ----------------------------------
 
 if [[ -n "$PROJECT_NUMBER" ]]; then
-  echo "🔗 Linking Apps Script project to Cloud project $PROJECT_NUMBER…" >&2
+  echo "Linking Apps Script project to Cloud project $PROJECT_NUMBER..." >&2
   # `clasp setting projectId` sets the cloud project ID. For numeric project
   # numbers this is equivalent and accepted by the API.
   # We continue even if the command fails because the project may already be
   # linked or the clasp version does not support the setting command.
   if ! clasp setting projectId "$PROJECT_NUMBER" >/dev/null 2>&1; then
-    echo "⚠️  Unable to set projectId (clasp may not support it) – continuing." >&2
+    echo "Warning: unable to set projectId (clasp may not support it) - continuing." >&2
   fi
 fi
 
 # Step 5 – Create version & deploy -------------------------------------------
 
-echo "🏷️  Creating new script version…" >&2
+echo "Creating new script version..." >&2
 VERSION_OUTPUT=$(clasp version "$DESCRIPTION")
 # Parse the version number (last number in the output)
 VERSION_NUMBER=$(echo "$VERSION_OUTPUT" | grep -Eo '[0-9]+' | tail -1)
 
 if [[ -z "$VERSION_NUMBER" ]]; then
-  echo "❌ Failed to parse version number from clasp output:" >&2
+  echo "Failed to parse version number from clasp output:" >&2
   echo "$VERSION_OUTPUT" >&2
   exit 1
 fi
 
-echo "🚀 Deploying version $VERSION_NUMBER as head…" >&2
+echo "Deploying version $VERSION_NUMBER as head..." >&2
 clasp deploy -V "$VERSION_NUMBER" -d "$DESCRIPTION"
 
 # Post-deploy reminder --------------------------------------------------------
 
 cat <<EOF
 
-✅ Deployed!
+Deployment complete.
 Next steps:
   1. Optional: verify the new *Head* deployment in the Apps Script editor.
   2. Update the Google Chat API configuration with the new head deployment ID (if it changed).
