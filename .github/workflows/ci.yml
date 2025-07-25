@@ -50,8 +50,9 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          # Use Node.js 18 (LTS) for test run to match supported runner images.
-          node-version: 18
+          # The project currently uses Node v22 locally. GitHub runners have 22
+          # available – if not, fall back to the newest LTS (v20).
+          node-version: 22
           cache: 'npm'
 
       - name: Install dependencies
@@ -77,8 +78,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          # Use the same Node.js 18 LTS version for deployment steps.
-          node-version: 18
+          node-version: 22
           cache: 'npm'
 
       - name: Install dependencies
@@ -128,7 +128,3 @@ jobs:
 
       # Tidy up credentials so they don’t linger in the runner’s workspace or
       # get uploaded by a subsequent action.
-      - name: Remove sensitive files
-        if: always()
-        run: |
-          rm -f ~/.clasprc.json .clasp.json
