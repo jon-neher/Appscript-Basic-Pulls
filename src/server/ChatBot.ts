@@ -171,12 +171,41 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | nu
     // upstream HTTP query.
     const fullThread = await getThreadMessages(threadName);
 
-    // Reserve ~512 tokens for the system prompt, assistant response, and
-    // some breathing room. The remaining ~3584 tokens are available for
-    // providing conversation context to the model (4k total context window).
-    const MAX_CONTEXT_TOKENS = 4096 - 512;
+    // -----------------------------------------------------------------
+    // Token budgeting
+    // -----------------------------------------------------------------
 
-    const selected = buildContextWindow(fullThread, MAX_CONTEXT_TOKENS);
+    // The underlying model (gpt-3.5-turbo) offers a hard 4 096-token context
+    // window.  We reserve a fixed slice (≈512) for:
+    //   • the system instruction
+    //   • the assistant’s forthcoming answer
+    //   • miscellaneous over-heads (JSON, stop-tokens, etc.)
+    // Everything else is available for *conversation history*.
+
+    const MODEL_CONTEXT_LIMIT = 4096;
+    const RESERVED_FOR_SYSTEM_AND_REPLY = 512;
+
+    // Speaker prefixes ("User:", "Assistant:") plus the trailing newline that
+    // joins lines into the final prompt each consume a handful of tokens.  To
+    // avoid accidental spill-over we subtract a *per-message* safety margin.
+    // A conservative 4-token allowance per line is plenty ("Assistant:" → 2
+    // tokens, "\n" → 1, plus 1 spare).
+    const PER_MESSAGE_MARGIN = 4;
+
+    // First pass – build a context window ignoring the per-line overhead so we
+    // can count how many messages *might* fit.
+    const initialBudget = MODEL_CONTEXT_LIMIT - RESERVED_FOR_SYSTEM_AND_REPLY;
+    let selected = buildContextWindow(fullThread, initialBudget);
+
+    // Second pass – shrink the budget by the margin now that we know the
+    // message count.  Re-run the window builder so the utility can trim further
+    // if needed.
+    const marginBudget = PER_MESSAGE_MARGIN * selected.length;
+    const adjustedBudget = initialBudget - marginBudget;
+
+    if (adjustedBudget < initialBudget) {
+      selected = buildContextWindow(fullThread, Math.max(adjustedBudget, 0));
+    }
 
     const SYSTEM_INST = 'You are a helpful and concise AI assistant.';
 
