@@ -23,6 +23,24 @@
 // Runtime detection helpers
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Memoised dynamic imports – GoogleChatService & LLM abstraction
+// ---------------------------------------------------------------------------
+
+/**
+* Cache objects for dynamically imported heavy modules so that `import()` is
+* executed only once per module. Subsequent calls reuse the already–resolved
+* module reference which avoids repeated module graph construction (and
+* potential network/disk latency when running in a non-bundled Node.js
+* environment such as tests).
+*/
+
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+let chatServiceModule: typeof import('../services/GoogleChatService') | null = null;
+
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+let llmModule: typeof import('../llm/index') | null = null;
+
 /**
 * Very small feature-flag that tells us whether we are executing inside a
 * Node.js process. When bundled for Apps Script the global `process` object is
@@ -122,9 +140,18 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown>> {
   }
 
   try {
-    // Dynamically import heavy deps so that the Apps Script bundle stays slim.
-    const { getThreadMessages } = await import('../services/GoogleChatService');
-    const { generateText } = await import('../llm/index');
+    // Dynamically import heavy deps – memoised so the import executes only
+    // once per module across the lifetime of the process.
+
+    if (!chatServiceModule) {
+      chatServiceModule = await import('../services/GoogleChatService');
+    }
+    if (!llmModule) {
+      llmModule = await import('../llm/index');
+    }
+
+    const { getThreadMessages } = chatServiceModule;
+    const { generateText } = llmModule;
 
     const allMessages = await getThreadMessages(threadName);
     const contextWindow = 10;
