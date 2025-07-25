@@ -156,15 +156,64 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | nu
     const { getThreadMessages } = chatServiceModule;
     const { generateText } = llmModule;
 
-    const contextWindow = 10;
-    // Fetch only the last `contextWindow` messages using the optimised
-    // pagination provided by GoogleChatService.
-    const recent = await getThreadMessages(threadName, contextWindow);
+    // -------------------------------------------------------------------
+    // VEN-45 – Build context window that fits within ~4k token budget.
+    // -------------------------------------------------------------------
+
+    // Dynamically import the lightweight utility (no heavy deps).
+    const { buildContextWindow } = await import('../llm/contextWindow');
+
+    // Fetch the **full** thread so the contextWindow util can pick the best
+    // subset according to the first+latest10+budget heuristic.
+    // We omit the optional `limit` argument so the service falls back to its
+    // internal paging logic which fetches all pages in chunks of 100 – thus
+    // avoiding any chance of the literal string "Infinity" leaking into the
+    // upstream HTTP query.
+    const fullThread = await getThreadMessages(threadName);
+
+    // Token budgeting --------------------------------------------------
+
+    // Our default OpenAI model (`gpt-4o-mini`) can accommodate **much** larger
+    // prompts (≈128 000-token context window at the time of writing).  For the
+    // sake of latency, cost control, and backward-compatibility with smaller
+    // models we *intentionally* cap the effective context to **4 096 tokens**.
+    //
+    // We then reserve a fixed slice (≈512 tokens) for:
+    //   • the system instruction
+    //   • the assistant’s forthcoming answer
+    //   • miscellaneous overhead (role labels, JSON wrapper, stop-tokens …)
+    //
+    // The remaining ~3 584 tokens are available for *conversation history*.
+
+    const MODEL_CONTEXT_LIMIT = 4096;
+    const RESERVED_FOR_SYSTEM_AND_REPLY = 512;
+
+    // Speaker prefixes ("User:", "Assistant:") plus the trailing newline that
+    // joins lines into the final prompt each consume a handful of tokens.  To
+    // avoid accidental spill-over we subtract a *per-message* safety margin.
+    // A conservative 4-token allowance per line is plenty ("Assistant:" → 2
+    // tokens, "\n" → 1, plus 1 spare).
+    const PER_MESSAGE_MARGIN = 4;
+
+    // First pass – build a context window ignoring the per-line overhead so we
+    // can count how many messages *might* fit.
+    const initialBudget = MODEL_CONTEXT_LIMIT - RESERVED_FOR_SYSTEM_AND_REPLY;
+    let selected = buildContextWindow(fullThread, initialBudget);
+
+    // Second pass – shrink the budget by the margin now that we know the
+    // message count.  Re-run the window builder so the utility can trim further
+    // if needed.
+    const marginBudget = PER_MESSAGE_MARGIN * selected.length;
+    const adjustedBudget = initialBudget - marginBudget;
+
+    if (adjustedBudget < initialBudget) {
+      selected = buildContextWindow(fullThread, Math.max(adjustedBudget, 0));
+    }
 
     const SYSTEM_INST = 'You are a helpful and concise AI assistant.';
 
     const lines: string[] = [];
-    for (const msg of recent) {
+    for (const msg of selected) {
       if (!msg.text) continue;
       const speaker = msg.isAiBot ? 'Assistant' : msg.sender?.displayName || 'User';
       lines.push(`${speaker}: ${msg.text}`);
