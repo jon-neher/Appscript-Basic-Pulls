@@ -119,6 +119,56 @@ After that you can iterate with the usual `push` / `pull` / `open` commands as d
 
 This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
 
+
+## Google Sheets integration (VEN-36)
+
+The `/capture-knowledge` command stores a small metadata entry for each captured
+thread in a dedicated Google Sheets spreadsheet. A more detailed conversation
+snapshot pipeline will be added in future issues, but the current minimal
+integration already provides a searchable audit trail for all captured
+conversations.
+
+### Service-account credentials
+
+1. In Google Cloud Console create a **service account** with at least the
+   _Editor_ role for the target spreadsheet (or grant the account direct edit
+   permissions in the Sheet’s **Share** dialog).
+2. Generate a **JSON key** and download the file.
+3. Move the JSON file to `config/google-sheets-credentials.json` (or any other
+   path outside version control) and make sure
+   `GOOGLE_APPLICATION_CREDENTIALS` points at that file.
+
+> The default `.gitignore` already excludes
+> `config/google-sheets-credentials.json` so you won’t accidentally commit the
+> secret. **Never** commit the raw key to a public repo.
+
+### Required environment variables
+
+Add the following variables to your `.env` (or export them in your CI/CD
+environment):
+
+```bash
+# .env.example
+GOOGLE_APPLICATION_CREDENTIALS="./config/google-sheets-credentials.json"
+SHEETS_SPREADSHEET_ID="1AbCdEfGhIjKlMnOpQrStUvWxYz1234567890"
+```
+
+### Spreadsheet layout
+
+The first worksheet of the spreadsheet must have **A1:D1** set to the exact
+header titles below. The integration will *append* new rows under this header:
+
+| A          | B      | C       | D   |
+| ---------- | ------ | ------- | --- |
+| Timestamp  | Source | Content | Tags |
+
+The `Tags` column receives a comma-separated string when multiple tags are
+present.
+
+Feel free to adjust column widths, enable text wrapping, or add filters – the
+integration uses the `USER_ENTERED` valueInputOption so formatting is
+preserved.
+
 ## Configuration Options
 
 All configuration now lives in a single file: `src/Config.gs`. Edit the

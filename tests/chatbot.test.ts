@@ -11,16 +11,16 @@ describe('/capture-knowledge slash command', () => {
     },
   } as any;
 
-  it('returns success message with extracted IDs', () => {
-    const response = onSlashCommand(baseEvent);
+  it('returns success message with extracted IDs', async () => {
+    const response = await onSlashCommand(baseEvent as any);
     expect(response.text).toContain('thread BBBB');
     expect(response.text).toContain('space AAAA');
   });
 
-  it('returns friendly error when thread missing', () => {
+  it('returns friendly error when thread missing', async () => {
     const event = JSON.parse(JSON.stringify(baseEvent));
     delete event.message.thread;
-    const response = onSlashCommand(event);
+    const response = await onSlashCommand(event);
     expect(response.text).toMatch(/sorry/i);
   });
 });

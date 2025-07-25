@@ -1,10 +1,95 @@
 /**
 * ChatBot.ts
-* Basic Google Chat bot handler exposing onMessage, onSlashCommand, and doPost entry points.
-* Implements VEN-25 `/capture-knowledge` slash-command logic.
+* Google Chat bot handler exposing onMessage, onSlashCommand, and doPost
+* entry points.
+*
+* NOTE: **Do not** add Node-specific imports at the top-level of this file.
+* When the bundle is executed inside Google Apps Script (GAS) the runtime does
+* not provide a Node.js standard library (`https`, `tls`, etc.).
+*
+* The Google Sheets integration that relies on `@googleapis/sheets` must
+* therefore be loaded dynamically **only** when the code is running under a
+* real Node.js environment (e.g. local CLI, Jest, or Cloud Functions test
+* harness).
+*
+* This conditional-loading approach avoids bundling the heavy dependency tree
+* into the `.gs` files pushed with clasp while preserving the same behaviour
+* when the bot is executed in a pure Node context.
 */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+// ---------------------------------------------------------------------------
+// Runtime detection helpers
+// ---------------------------------------------------------------------------
+
+/**
+* Very small feature-flag that tells us whether we are executing inside a
+* Node.js process. When bundled for Apps Script the global `process` object is
+* absent, so this check reliably discriminates between the two runtimes.
+*/
+const IS_NODE: boolean = typeof process !== 'undefined' && !!process?.versions?.node;
+
+// ---------------------------------------------------------------------------
+// Lazy Google Sheets integration (loaded only under Node.js)
+// ---------------------------------------------------------------------------
+
+type FormatCapturedKnowledgeFn = (entry: {
+  timestamp: string;
+  source: string;
+  content: string;
+  tags?: string[];
+}) => string[];
+
+type AppendRowsFn = (rows: string[][]) => Promise<void>;
+
+let formatCapturedKnowledge: FormatCapturedKnowledgeFn | null = null;
+let appendRows: AppendRowsFn | null = null;
+
+// Cached promise used to ensure the dynamic import happens at most once per
+// process. Subsequent callers of `ensureSheetsIntegration()` await the same
+// promise, guaranteeing idempotent initialisation.
+let sheetsIntegrationPromise: Promise<void> | null = null;
+
+/**
+* Dynamically import the Google Sheets integration the first time we need it.
+*
+* Because `import()` is just an expression it will be parsed without being
+* executed under GAS, but we still guard the call with `IS_NODE` to prevent
+* accidental resolution attempts.
+*/
+function ensureSheetsIntegration(): Promise<void> {
+  // Fast-exit when running under Apps Script / non-Node environments.
+  if (!IS_NODE) return Promise.resolve();
+
+  // If the helpers are already populated we have nothing to do. Prefer the
+  // cached promise (if any) so that concurrent callers share the same state.
+  if (formatCapturedKnowledge && appendRows) {
+    return sheetsIntegrationPromise ?? Promise.resolve();
+  }
+
+  // First caller kicks off the dynamic import and stores the resulting promise
+  // so that all other callers await the same work.
+  if (!sheetsIntegrationPromise) {
+    sheetsIntegrationPromise = import('../integrations/googleSheets')
+      .then((mod) => {
+        formatCapturedKnowledge = mod.formatCapturedKnowledge as FormatCapturedKnowledgeFn;
+        appendRows = mod.appendRows as AppendRowsFn;
+      })
+      .catch((err) => {
+        // Surface the error to all awaiters but keep a rejected promise cached
+        // so that future calls don’t repeatedly attempt to import.
+        console.error('Failed to load googleSheets integration', err);
+        throw err;
+      });
+  }
+
+  return sheetsIntegrationPromise;
+}
+
+// ---------------------------------------------------------------------------
+// Types & basic helpers
+// ---------------------------------------------------------------------------
 
 type ChatEvent = any; // Inline type placeholder – Apps Script runtime provides dynamic payload.
 
@@ -18,17 +103,21 @@ function createResponse({ text }: { text: string; event?: ChatEvent }): Record<s
 /**
 * Default onMessage handler – currently echoes a placeholder response.
 */
-function onMessage(event: ChatEvent) {
+function onMessage(event: ChatEvent): Record<string, unknown> {
   const userText = event?.message?.text ?? '';
   return createResponse({ text: `You said: "${userText}"` });
 }
 
+// ---------------------------------------------------------------------------
+// Slash-command handler
+// ---------------------------------------------------------------------------
+
 /**
 * Handle slash-command events from Google Chat.
 */
-function onSlashCommand(event: ChatEvent) {
-  // `commandId` is a numeric literal (per manifest) but we allow string literals for legacy
-  // internal commands such as "ping".
+async function onSlashCommand(event: ChatEvent): Promise<Record<string, unknown>> {
+  // `commandId` is a numeric literal (per manifest) but we allow string literals
+  // for legacy internal commands such as "ping".
   const commandId = event?.message?.slashCommand?.commandId as number | string;
 
   switch (commandId) {
@@ -52,7 +141,42 @@ function onSlashCommand(event: ChatEvent) {
         const spaceId = spaceName.split('/').pop() || spaceName;
         const threadId = threadName.split('/').pop() || threadName;
 
-        // In future this context will be persisted (VEN-26). For now, just acknowledge.
+        // Only attempt the Sheets write when running under Node.js.
+        if (IS_NODE) {
+          // Kick off (and await) the dynamic import so that helpers are ready
+          // before we attempt to build the row.
+          await ensureSheetsIntegration();
+
+          const maybeWrite = (): void => {
+            if (!formatCapturedKnowledge || !appendRows) {
+              // Integration not ready (shouldn’t happen because we awaited, but
+              // guard defensively so GAS runs safely when IS_NODE is falsy).
+              return;
+            }
+
+            try {
+              const knowledgeRow = formatCapturedKnowledge({
+                timestamp: new Date().toISOString(),
+                source: `${spaceId}/${threadId}`,
+                content: `Thread captured via /capture-knowledge (thread ${threadId})`,
+                tags: ['chat'],
+              });
+
+              // Fire-and-forget to keep the Chat latency low – errors are logged
+              // asynchronously and do NOT affect the immediate user response.
+              void appendRows([knowledgeRow]).catch((err) =>
+                console.error('Sheets append error', err)
+              );
+            } catch (sheetErr) {
+              // Don’t fail the command for Sheets errors – just log them.
+              console.error('googleSheets integration error', sheetErr);
+            }
+          };
+
+          // Execute immediately now that helpers are present.
+          maybeWrite();
+        }
+
         return createResponse({
           text: `Got it – captured context for thread ${threadId} in space ${spaceId}.`,
         });
@@ -85,10 +209,12 @@ function onSlashCommand(event: ChatEvent) {
 // ---------------------------------------------------------------------------
 
 /**
-* Apps Script `doPost` entrypoint. Accepts raw HTTP POST data from Chat.
+* Apps Script `doPost` entry-point. Accepts raw HTTP POST data from Chat.
 * Converts it to JSON and dispatches to the appropriate handler.
 */
-function doPost(e: GoogleAppsScript.Events.DoPost) {
+async function doPost(
+  e: GoogleAppsScript.Events.DoPost
+): Promise<GoogleAppsScript.Content.TextOutput> {
   try {
     const raw = e?.postData?.contents;
     if (!raw) {
@@ -101,7 +227,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost) {
 
     let response: Record<string, unknown> | null = null;
     if (event?.message?.slashCommand) {
-      response = onSlashCommand(event);
+      response = await onSlashCommand(event);
     } else if (event?.type === 'MESSAGE') {
       response = onMessage(event);
     }
@@ -118,7 +244,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost) {
 }
 
 // ---------------------------------------------------------------------------
-// Export functions for Apps Script runtime
+// Export top-level functions for the Apps Script runtime
 // ---------------------------------------------------------------------------
 
 (globalThis as any).onMessage = onMessage;
