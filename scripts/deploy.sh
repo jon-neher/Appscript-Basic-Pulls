@@ -18,8 +18,8 @@ usage() {
 Usage: $(basename "$0") [options]
 
 Options:
-  -p, --project <number>    12-digit GCP project number that owns the Chat API.
-  -d, --description <text>  Deployment description. Defaults to short git SHA.
+  -p, --project <number>    12-digit GCP project number that owns the Chat API (passed to clasp).
+  -d, --description <text>  Deployment description (annotates the created version & deployment).
   -r, --root <dir>          Directory to push with clasp. Defaults to "dist".
   -h, --help                Show this message and exit.
 
@@ -79,14 +79,42 @@ npm run build
 echo "🚀 Pushing $ROOT_DIR to Apps Script…" >&2
 clasp push --rootDir "$ROOT_DIR"
 
+# Step 4 – (Optional) Link to Cloud project ----------------------------------
+
+if [[ -n "$PROJECT_NUMBER" ]]; then
+  echo "🔗 Linking Apps Script project to Cloud project $PROJECT_NUMBER…" >&2
+  # `clasp setting projectId` sets the cloud project ID. For numeric project
+  # numbers this is equivalent and accepted by the API.
+  # We continue even if the command fails because the project may already be
+  # linked or the clasp version does not support the setting command.
+  if ! clasp setting projectId "$PROJECT_NUMBER" >/dev/null 2>&1; then
+    echo "⚠️  Unable to set projectId (clasp may not support it) – continuing." >&2
+  fi
+fi
+
+# Step 5 – Create version & deploy -------------------------------------------
+
+echo "🏷️  Creating new script version…" >&2
+VERSION_OUTPUT=$(clasp version "$DESCRIPTION")
+# Parse the version number (last number in the output)
+VERSION_NUMBER=$(echo "$VERSION_OUTPUT" | grep -Eo '[0-9]+' | tail -1)
+
+if [[ -z "$VERSION_NUMBER" ]]; then
+  echo "❌ Failed to parse version number from clasp output:" >&2
+  echo "$VERSION_OUTPUT" >&2
+  exit 1
+fi
+
+echo "🚀 Deploying version $VERSION_NUMBER as head…" >&2
+clasp deploy -V "$VERSION_NUMBER" -d "$DESCRIPTION"
+
 # Post-deploy reminder --------------------------------------------------------
 
 cat <<EOF
 
 ✅ Deployed!
 Next steps:
-  1. Open the Apps Script editor → Deploy → Test deployments.
-  2. Deploy the head version if prompted.
-  3. Update the Google Chat API config with the new head deployment ID.
+  1. Optional: verify the new *Head* deployment in the Apps Script editor.
+  2. Update the Google Chat API configuration with the new head deployment ID (if it changed).
 
 EOF
