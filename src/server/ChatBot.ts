@@ -7,12 +7,13 @@
 * When the bundle is executed inside Google Apps Script (GAS) the runtime does
 * not provide a Node.js standard library (`https`, `tls`, etc.).
 *
-* The Google Sheets integration that relies on `@googleapis/sheets` must therefore
-* be loaded dynamically **only** when the code is running under a real Node.js
-* environment (e.g. local CLI, Jest, or Cloud Functions test harness).
+* The Google Sheets integration that relies on `@googleapis/sheets` must
+* therefore be loaded dynamically **only** when the code is running under a
+* real Node.js environment (e.g. local CLI, Jest, or Cloud Functions test
+* harness).
 *
 * This conditional-loading approach avoids bundling the heavy dependency tree
-* into the `.gs` files pushed with `clasp` while preserving the same behaviour
+* into the `.gs` files pushed with clasp while preserving the same behaviour
 * when the bot is executed in a pure Node context.
 */
 
@@ -45,6 +46,11 @@ type AppendRowsFn = (rows: string[][]) => Promise<void>;
 let formatCapturedKnowledge: FormatCapturedKnowledgeFn | null = null;
 let appendRows: AppendRowsFn | null = null;
 
+// Cached promise used to ensure the dynamic import happens at most once per
+// process. Subsequent callers of `ensureSheetsIntegration()` await the same
+// promise, guaranteeing idempotent initialisation.
+let sheetsIntegrationPromise: Promise<void> | null = null;
+
 /**
 * Dynamically import the Google Sheets integration the first time we need it.
 *
@@ -52,34 +58,18 @@ let appendRows: AppendRowsFn | null = null;
 * executed under GAS, but we still guard the call with `IS_NODE` to prevent
 * accidental resolution attempts.
 */
-/**
-* Promise that resolves once the Google Sheets integration has been imported
-* and the helpers have been cached. A `null` value means the import has not
-* been attempted yet.
-*/
-let sheetsIntegrationPromise: Promise<unknown> | null = null;
-
-/**
-* Dynamically load the Google Sheets integration **exactly once** per process
-* and expose the exported helpers via the module-level variables declared
-* above. Subsequent calls return the same promise so that concurrent
-* invocations can simply `await` the first import instead of triggering extra
-* work.
-*/
 function ensureSheetsIntegration(): Promise<void> {
-  if (!IS_NODE) {
-    // In the Apps Script runtime the integration is never required.
-    return Promise.resolve();
-  }
+  // Fast-exit when running under Apps Script / non-Node environments.
+  if (!IS_NODE) return Promise.resolve();
 
-  // If the helpers are already populated we can return a resolved promise
-  // immediately. This is the fast-path for the common case where the module
-  // has been imported once earlier in the process life-cycle.
+  // If the helpers are already populated we have nothing to do. Prefer the
+  // cached promise (if any) so that concurrent callers share the same state.
   if (formatCapturedKnowledge && appendRows) {
-    return Promise.resolve();
+    return sheetsIntegrationPromise ?? Promise.resolve();
   }
 
-  // Kick off the dynamic import exactly once.
+  // First caller kicks off the dynamic import and stores the resulting promise
+  // so that all other callers await the same work.
   if (!sheetsIntegrationPromise) {
     sheetsIntegrationPromise = import('../integrations/googleSheets')
       .then((mod) => {
@@ -87,15 +77,14 @@ function ensureSheetsIntegration(): Promise<void> {
         appendRows = mod.appendRows as AppendRowsFn;
       })
       .catch((err) => {
-        // Surface the error so callers can decide whether to retry or ignore.
+        // Surface the error to all awaiters but keep a rejected promise cached
+        // so that future calls don’t repeatedly attempt to import.
         console.error('Failed to load googleSheets integration', err);
         throw err;
       });
   }
 
-  // Coerce to `Promise<void>` so that callers don't rely on the imported
-  // module shape. The helpers are exposed via the cached variables.
-  return sheetsIntegrationPromise.then(() => undefined);
+  return sheetsIntegrationPromise;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +115,7 @@ function onMessage(event: ChatEvent): Record<string, unknown> {
 /**
 * Handle slash-command events from Google Chat.
 */
-function onSlashCommand(event: ChatEvent): Record<string, unknown> {
+async function onSlashCommand(event: ChatEvent): Promise<Record<string, unknown>> {
   // `commandId` is a numeric literal (per manifest) but we allow string literals
   // for legacy internal commands such as "ping".
   const commandId = event?.message?.slashCommand?.commandId as number | string;
@@ -154,10 +143,14 @@ function onSlashCommand(event: ChatEvent): Record<string, unknown> {
 
         // Only attempt the Sheets write when running under Node.js.
         if (IS_NODE) {
+          // Kick off (and await) the dynamic import so that helpers are ready
+          // before we attempt to build the row.
+          await ensureSheetsIntegration();
+
           const maybeWrite = (): void => {
             if (!formatCapturedKnowledge || !appendRows) {
-              // Integration not ready yet – this should not happen after
-              // awaiting `ensureSheetsIntegration()` but we guard just in case.
+              // Integration not ready (shouldn’t happen because we awaited, but
+              // guard defensively so GAS runs safely when IS_NODE is falsy).
               return;
             }
 
@@ -180,18 +173,8 @@ function onSlashCommand(event: ChatEvent): Record<string, unknown> {
             }
           };
 
-          // Kick off an async task so we can await the integration promise
-          // without turning the entire slash-command handler into an async
-          // function (which would break the synchronous Apps Script contract).
-          void (async () => {
-            try {
-              await ensureSheetsIntegration();
-              maybeWrite();
-            } catch (loadErr) {
-              // Import failed – already logged inside ensureSheetsIntegration().
-              console.error('Sheets integration initialisation failed', loadErr);
-            }
-          })();
+          // Execute immediately now that helpers are present.
+          maybeWrite();
         }
 
         return createResponse({
@@ -229,7 +212,9 @@ function onSlashCommand(event: ChatEvent): Record<string, unknown> {
 * Apps Script `doPost` entry-point. Accepts raw HTTP POST data from Chat.
 * Converts it to JSON and dispatches to the appropriate handler.
 */
-function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.TextOutput {
+async function doPost(
+  e: GoogleAppsScript.Events.DoPost
+): Promise<GoogleAppsScript.Content.TextOutput> {
   try {
     const raw = e?.postData?.contents;
     if (!raw) {
@@ -242,7 +227,7 @@ function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.Tex
 
     let response: Record<string, unknown> | null = null;
     if (event?.message?.slashCommand) {
-      response = onSlashCommand(event);
+      response = await onSlashCommand(event);
     } else if (event?.type === 'MESSAGE') {
       response = onMessage(event);
     }
