@@ -14,6 +14,12 @@
 * sender matches the configured AI-bot identity.
 */
 
+// ---------------------------------------------------------------------------
+// Imports
+// ---------------------------------------------------------------------------
+
+import { getConfig } from '../config/index';
+
 // NOTE: We previously disabled `@typescript-eslint/no-explicit-any` for the entire
 // file.  That blanket disable hid potentially unsafe `any` usages and could allow
 // accidental regressions. We now scope the rule to the handful of intentional
@@ -56,18 +62,19 @@ export interface ChatMessage {
 * – In Node/CI the token must be supplied via the env var GOOGLE_CHAT_ACCESS_TOKEN.
 */
 function getAccessToken(): string {
-  // Apps Script runtime
+  // 1) Apps Script runtime – prefer the project-bound OAuth token.
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore – ScriptApp is only defined in Apps Script
-  if (typeof ScriptApp !== 'undefined' && typeof ScriptApp.getOAuthToken === 'function') {
-    // @ts-ignore – ScriptApp typings only available in GAS
+  // @ts-ignore – ScriptApp only exists in GAS
+  if (
+    typeof ScriptApp !== 'undefined' &&
+    typeof ScriptApp.getOAuthToken === 'function'
+  ) {
+    // @ts-ignore
     return ScriptApp.getOAuthToken();
   }
 
-  const token = process.env.GOOGLE_CHAT_ACCESS_TOKEN;
-  if (token) return token;
-
-  throw new Error('No Google Chat OAuth token found. Set GOOGLE_CHAT_ACCESS_TOKEN.');
+  // 2) Node / tests – expect the token via config layer (process.env passthrough)
+  return getConfig('GOOGLE_CHAT_ACCESS_TOKEN');
 }
 
 /**
@@ -87,26 +94,8 @@ function getAccessToken(): string {
 function isAiBotSender(sender: any): boolean {
   if (!sender) return false;
 
-  // Try Apps Script properties first (no-ops in Node)
-  let botUserId: string | undefined;
-  let botDisplayName: string | undefined;
-
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore – PropertiesService only exists in GAS
-  if (typeof PropertiesService !== 'undefined') {
-    // @ts-ignore
-    const props = PropertiesService?.getScriptProperties?.();
-    botUserId = props?.getProperty?.('AI_BOT_USER_ID') as string | undefined;
-    botDisplayName = props?.getProperty?.('AI_BOT_DISPLAY_NAME') as string | undefined;
-  }
-
-  // Fallback to env vars for Node/tests – guard access in case `process` is
-  // undefined (e.g. Apps Script runtime). Accessing `process` unconditionally
-  // would throw a ReferenceError in that environment.
-  if (typeof process !== 'undefined') {
-    botUserId = botUserId || process.env.AI_BOT_USER_ID;
-    botDisplayName = botDisplayName || process.env.AI_BOT_DISPLAY_NAME;
-  }
+  const botUserId = getConfig('AI_BOT_USER_ID', { required: false });
+  const botDisplayName = getConfig('AI_BOT_DISPLAY_NAME', { required: false });
 
   return (
     (!!botUserId && sender.name === botUserId) ||

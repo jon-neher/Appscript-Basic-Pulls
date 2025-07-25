@@ -20,6 +20,7 @@
 */
 
 import { google, sheets_v4 } from 'googleapis';
+import { getConfig } from '../config/index';
 
 // ---------------------------------------------------------------------------
 // Constants & types
@@ -59,13 +60,7 @@ async function getSheetsClient(): Promise<sheets_v4.Sheets> {
 }
 
 function defaultSpreadsheetId(): string {
-  const id = process.env.SHEETS_SPREADSHEET_ID;
-  if (!id) {
-    throw new Error(
-      'Missing spreadsheet id – set SHEETS_SPREADSHEET_ID in the environment or pass it explicitly.'
-    );
-  }
-  return id;
+  return getConfig('SHEETS_SPREADSHEET_ID');
 }
 
 // ---------------------------------------------------------------------------
