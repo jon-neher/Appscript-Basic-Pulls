@@ -47,10 +47,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Use Node.js
+      - name: Use Node.js (LTS 18)
         uses: actions/setup-node@v4
         with:
-          # Use the current Node.js LTS (v18) for maximum runner availability.
+          # Pin to the current LTS (18) for maximum runner availability.
           node-version: 18
           cache: 'npm'
 
@@ -74,10 +74,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Use Node.js
+      - name: Use Node.js (LTS 18)
         uses: actions/setup-node@v4
         with:
-          # Use the current Node.js LTS (v18) to match the test job.
+          # Pin to the current LTS (18) to match the test job.
           node-version: 18
           cache: 'npm'
 
@@ -128,3 +128,8 @@ jobs:
 
       # Tidy up credentials so they don’t linger in the runner’s workspace or
       # get uploaded by a subsequent action.
+
+      - name: Remove sensitive files
+        if: always()
+        run: |
+          rm -f "$HOME/.clasprc.json" .clasp.json
