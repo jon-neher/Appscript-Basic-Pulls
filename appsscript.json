@@ -18,6 +18,11 @@
         "commandId": 1,
         "displayName": "Ask a question",
         "runFunction": "onMessage"
+      },
+      {
+        "commandId": 2,
+        "description": "Capture the current thread's context for knowledge base indexing",
+        "runFunction": "onSlashCommand"
       }
     ],
     "postInstallationPrompt": {
