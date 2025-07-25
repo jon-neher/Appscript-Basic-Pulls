@@ -156,15 +156,28 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | nu
     const { getThreadMessages } = chatServiceModule;
     const { generateText } = llmModule;
 
-    const contextWindow = 10;
-    // Fetch only the last `contextWindow` messages using the optimised
-    // pagination provided by GoogleChatService.
-    const recent = await getThreadMessages(threadName, contextWindow);
+    // -------------------------------------------------------------------
+    // VEN-45 – Build context window that fits within ~4k token budget.
+    // -------------------------------------------------------------------
+
+    // Dynamically import the lightweight utility (no heavy deps).
+    const { buildContextWindow } = await import('../llm/contextWindow');
+
+    // Fetch the **full** thread so the contextWindow util can pick the best
+    // subset according to the first+latest10+budget heuristic.
+    const fullThread = await getThreadMessages(threadName, Infinity);
+
+    // Reserve ~512 tokens for the system prompt, assistant response, and
+    // some breathing room. The remaining ~3584 tokens are available for
+    // providing conversation context to the model (4k total context window).
+    const MAX_CONTEXT_TOKENS = 4096 - 512;
+
+    const selected = buildContextWindow(fullThread, MAX_CONTEXT_TOKENS);
 
     const SYSTEM_INST = 'You are a helpful and concise AI assistant.';
 
     const lines: string[] = [];
-    for (const msg of recent) {
+    for (const msg of selected) {
       if (!msg.text) continue;
       const speaker = msg.isAiBot ? 'Assistant' : msg.sender?.displayName || 'User';
       lines.push(`${speaker}: ${msg.text}`);
