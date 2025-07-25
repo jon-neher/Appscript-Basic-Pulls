@@ -1,0 +1,41 @@
+{
+  "timeZone": "America/Regina",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/chat.bot",
+    "https://www.googleapis.com/auth/script.external_request"
+  ],
+  "chat": {
+    "name": "Knowledge Assistant",
+    "description": "Answer questions and suggest helpful content",
+    "avatarUrl": "https://example.com/logo.png",
+    "homepageTrigger": {
+      "runFunction": "onHomepage"
+    },
+    "commandTriggers": [
+      {
+        "commandId": 1,
+        "displayName": "Ask a question",
+        "runFunction": "onMessage"
+      }
+    ],
+    "postInstallationPrompt": {
+      "title": "Thanks for installing Knowledge Assistant",
+      "body": "Type @KnowledgeAssistant <your-question> to get started."
+    }
+  },
+  "webapp": {
+    "access": "DOMAIN",
+    "executeAs": "USER_ACCESSING"
+  },
+  "dependencies": {
+    "enabledAdvancedServices": [
+      {
+        "userSymbol": "Chat",
+        "serviceId": "chat",
+        "version": "v1"
+      }
+    ]
+  }
+}
