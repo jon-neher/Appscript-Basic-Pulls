@@ -12,7 +12,7 @@
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
     "build": "node build/esbuild.config.js && node build/copyManifest.mjs",
     "watch": "node build/esbuild.config.js --watch",
-    "deploy": "npm run build && clasp deploy --description \"Deploy from CI\"",
+    "deploy": "npm run build && clasp push --rootDir dist && clasp deploy --description \"Deploy from CI\"",
     "logs": "clasp logs --watch",
     "analyse": "node bin/crawl-and-analyse.js"
   },
