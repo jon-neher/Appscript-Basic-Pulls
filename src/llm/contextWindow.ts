@@ -69,10 +69,6 @@ export function buildContextWindow<T extends MessageLike>(
   fullMessages: T[],
   maxTokens: number,
 ): T[] {
-  // ---------------------------------------------------------------------
-  // Budget guards
-  // ---------------------------------------------------------------------
-
   // 0. Treat positive Infinity as *unlimited* budget – return a shallow copy
   //    so callers cannot mutate the input array.
   if (maxTokens === Infinity) {
