@@ -101,7 +101,11 @@ function createResponse({ text }: { text: string; event?: ChatEvent }): Record<s
 }
 
 /**
-* Default onMessage handler – currently echoes a placeholder response.
+* onMessage – entry point for non slash-command MESSAGE events.
+*
+* Fetches recent thread context, builds a prompt, calls the LLM abstraction
+* to generate a helpful and concise reply, and returns the response in the
+* format expected by Google Chat.
 */
 async function onMessage(event: ChatEvent): Promise<Record<string, unknown>> {
   // Ignore slash-command events entirely.
