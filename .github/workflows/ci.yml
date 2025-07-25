@@ -125,3 +125,10 @@ jobs:
 
       - name: Deploy production version
         run: npx clasp deploy --description "CI deploy $GITHUB_SHA"
+
+      # Tidy up credentials so they don’t linger in the runner’s workspace or
+      # get uploaded by a subsequent action.
+      - name: Remove sensitive files
+        if: always()
+        run: |
+          rm -f ~/.clasprc.json .clasp.json
