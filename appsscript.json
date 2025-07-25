@@ -21,7 +21,6 @@
       },
       {
         "commandId": "capture-knowledge",
-        "triggers": ["MESSAGE"],
         "description": "Capture the current thread's context for knowledge base indexing",
         "runFunction": "onSlashCommand"
       }
