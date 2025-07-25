@@ -47,6 +47,88 @@ export interface ThreadKnowledgeData {
 }
 
 // ---------------------------------------------------------------------------
+// Serialisation helper – converts structured data to Markdown (fallback JSON)
+// ---------------------------------------------------------------------------
+
+/**
+* Maximum character length that safely fits into a single Google Sheets cell
+* (the documented limit is 50 000).  We subtract a couple of extra characters
+* when clipping so we can append an ellipsis without overflowing.
+*/
+export const MAX_SHEETS_CELL_LEN = 50_000;
+
+/**
+* Convert a `ThreadKnowledgeData` object into a compact Markdown string that
+* preserves the conversational flow.  We favour Markdown over JSON here
+* because it is more readable when opened directly in the Google Sheets UI
+* while still being completely loss-less (all structured data is included).
+*
+* The format is deliberately simple and stable so that a future parser can
+* reliably recover the structure:
+*
+* ```md
+* ## Original Question  (2025-07-25 10:00)
+* <content>
+*
+* ## AI Response #1  (2025-07-25 10:01)
+* <assistant answer>
+*
+* ### Corrections
+* - (2025-07-25 10:02) user123: <text>
+* - …
+*
+* ## AI Response #2 …
+* ```
+*
+* @param data Structured thread knowledge object.
+* @returns A Markdown string (clipped to 50 000 chars if necessary).
+*/
+export function serialiseThreadKnowledgeMarkdown(data: ThreadKnowledgeData): string {
+  const parts: string[] = [];
+
+  const fmtTs = (iso: string): string => {
+    // Convert to "YYYY-MM-DD HH:MM" in the spreadsheet's local timezone loses
+    // fidelity, so we keep the ISO string but drop the seconds for brevity.
+    const d = new Date(iso);
+    // Guard against unparsable strings – Date → NaN produces "Invalid Date".
+    if (Number.isNaN(d.getTime())) return iso;
+
+    // Year-month-day hour:minute in UTC for determinism.
+    // Using slice avoids fragile regexes that might fail on ISO strings without
+    // fractional seconds or with timezone offsets. `toISOString()` always
+    // yields `YYYY-MM-DDTHH:mm:ss.sssZ`, so slicing the first 16 chars gives
+    // `YYYY-MM-DDTHH:mm`. We then replace the `T` with a space.
+    return d.toISOString().slice(0, 16).replace('T', ' ');
+  };
+
+  // Original question
+  parts.push(`## Original Question  (${fmtTs(data.originalQuestion.timestamp)})`);
+  parts.push(data.originalQuestion.content.trim());
+
+  data.responses.forEach((block, idx) => {
+    parts.push('');
+    parts.push(`## AI Response #${idx + 1}  (${fmtTs(block.aiResponse.timestamp)})`);
+    parts.push(block.aiResponse.content.trim());
+
+    if (block.corrections.length) {
+      parts.push('');
+      parts.push('### Corrections');
+      block.corrections.forEach((c) => {
+        parts.push(`- (${fmtTs(c.timestamp)}) ${c.authorId}: ${c.content.trim()}`);
+      });
+    }
+  });
+
+  let markdown = parts.join('\n');
+
+  if (markdown.length > MAX_SHEETS_CELL_LEN) {
+    markdown = markdown.slice(0, MAX_SHEETS_CELL_LEN - 3) + '…';
+  }
+
+  return markdown;
+}
+
+// ---------------------------------------------------------------------------
 // Implementation
 // ---------------------------------------------------------------------------
 

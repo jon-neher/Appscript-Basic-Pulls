@@ -263,40 +263,70 @@ async function onSlashCommand(event: ChatEvent): Promise<Record<string, unknown>
         const spaceId = spaceName.split('/').pop() || spaceName;
         const threadId = threadName.split('/').pop() || threadName;
 
-        // Only attempt the Sheets write when running under Node.js.
+        // Only perform the heavy thread fetch + Sheets write when running
+        // inside a real Node.js environment.  Google Apps Script lacks support
+        // for dynamic `import()` so the logic below must *never* execute under
+        // GAS.
+
         if (IS_NODE) {
-          // Kick off (and await) the dynamic import so that helpers are ready
-          // before we attempt to build the row.
+          // --------------------------------------------
+          // Dynamic imports (Chat service + processors)
+          // --------------------------------------------
+
+          // Google Chat REST client (memoised across requests)
+          if (!chatServiceModule) {
+            chatServiceModule = await import('../services/GoogleChatService');
+          }
+
+          // Lightweight helpers (no external deps)
+          // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+          const { parseThreadMessages, serialiseThreadKnowledgeMarkdown } =
+            await import('../pipeline/ThreadDataProcessor');
+
+          const { getThreadMessages } = chatServiceModule;
+
+          // Fetch the **full** thread (auto-paged beyond 100-message API cap).
+          const fullThread = await getThreadMessages(threadName);
+
+          // Transform Chat API messages into minimal shape expected by
+          // `parseThreadMessages()`.
+          const rawMessages = fullThread.map((m: any) => ({
+            messageId: m.name,
+            authorId: m.sender?.displayName || m.sender?.name || 'unknown',
+            content: m.text ?? '',
+            timestamp: m.createTime ?? new Date().toISOString(),
+            isBot: m.isAiBot ?? false,
+          }));
+
+          const structured = parseThreadMessages(rawMessages);
+          const markdown = serialiseThreadKnowledgeMarkdown(structured);
+
+          // --------------------------
+          // Write row to Google Sheets
+          // --------------------------
+
+          // Ensure Sheets helpers are loaded *after* we have serialised the
+          // content (serialisation is dependency-free and faster).
           await ensureSheetsIntegration();
 
-          const maybeWrite = (): void => {
-            if (!formatCapturedKnowledge || !appendRows) {
-              // Integration not ready (shouldn’t happen because we awaited, but
-              // guard defensively so GAS runs safely when IS_NODE is falsy).
-              return;
-            }
-
+          if (formatCapturedKnowledge && appendRows) {
             try {
               const knowledgeRow = formatCapturedKnowledge({
                 timestamp: new Date().toISOString(),
                 source: `${spaceId}/${threadId}`,
-                content: `Thread captured via /capture-knowledge (thread ${threadId})`,
+                content: markdown,
                 tags: ['chat'],
               });
 
-              // Fire-and-forget to keep the Chat latency low – errors are logged
-              // asynchronously and do NOT affect the immediate user response.
+              // Fire-and-forget to keep Chat latency low; errors are logged but
+              // do NOT bubble up to the slash-command response.
               void appendRows([knowledgeRow]).catch((err) =>
                 console.error('Sheets append error', err)
               );
             } catch (sheetErr) {
-              // Don’t fail the command for Sheets errors – just log them.
               console.error('googleSheets integration error', sheetErr);
             }
-          };
-
-          // Execute immediately now that helpers are present.
-          maybeWrite();
+          }
         }
 
         return createResponse({
