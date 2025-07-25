@@ -57,4 +57,10 @@ describe('buildContextWindow', () => {
   it('returns empty array when given none', () => {
     expect(buildContextWindow([], 10)).toEqual([]);
   });
+
+  it('treats Infinity budget as unlimited', () => {
+    const msgs = [makeMsg('a'), makeMsg('b'), makeMsg('c')];
+    const result = buildContextWindow(msgs, Infinity);
+    expect(result).toEqual(msgs);
+  });
 });

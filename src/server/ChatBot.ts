@@ -165,7 +165,11 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | nu
 
     // Fetch the **full** thread so the contextWindow util can pick the best
     // subset according to the first+latest10+budget heuristic.
-    const fullThread = await getThreadMessages(threadName, Infinity);
+    // We omit the optional `limit` argument so the service falls back to its
+    // internal paging logic which fetches all pages in chunks of 100 – thus
+    // avoiding any chance of the literal string "Infinity" leaking into the
+    // upstream HTTP query.
+    const fullThread = await getThreadMessages(threadName);
 
     // Reserve ~512 tokens for the system prompt, assistant response, and
     // some breathing room. The remaining ~3584 tokens are available for
