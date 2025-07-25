@@ -171,9 +171,7 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | nu
     // upstream HTTP query.
     const fullThread = await getThreadMessages(threadName);
 
-    // -----------------------------------------------------------------
-    // Token budgeting
-    // -----------------------------------------------------------------
+    // Token budgeting --------------------------------------------------
 
     // The underlying model (gpt-3.5-turbo) offers a hard 4 096-token context
     // window.  We reserve a fixed slice (≈512) for:
