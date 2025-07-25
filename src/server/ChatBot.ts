@@ -52,24 +52,50 @@ let appendRows: AppendRowsFn | null = null;
 * executed under GAS, but we still guard the call with `IS_NODE` to prevent
 * accidental resolution attempts.
 */
-function ensureSheetsIntegration(): void {
-  if (!IS_NODE) return; // Skip entirely when running on GAS.
+/**
+* Promise that resolves once the Google Sheets integration has been imported
+* and the helpers have been cached. A `null` value means the import has not
+* been attempted yet.
+*/
+let sheetsIntegrationPromise: Promise<unknown> | null = null;
 
-  if (formatCapturedKnowledge && appendRows) return; // Already initialised.
+/**
+* Dynamically load the Google Sheets integration **exactly once** per process
+* and expose the exported helpers via the module-level variables declared
+* above. Subsequent calls return the same promise so that concurrent
+* invocations can simply `await` the first import instead of triggering extra
+* work.
+*/
+function ensureSheetsIntegration(): Promise<void> {
+  if (!IS_NODE) {
+    // In the Apps Script runtime the integration is never required.
+    return Promise.resolve();
+  }
 
-  // Use `import()` instead of `require` so that we stay compatible with both
-  // ESM and CJS compilation targets. The promise is deliberately *not* awaited
-  // because callers use the functions in a fire-and-forget manner.
-  void import('../integrations/googleSheets')
-    .then((mod) => {
-      formatCapturedKnowledge = mod.formatCapturedKnowledge as FormatCapturedKnowledgeFn;
-      appendRows = mod.appendRows as AppendRowsFn;
-    })
-    .catch((err) => {
-      // Log once – subsequent calls will still try to import again so that a
-      // transient failure (e.g. network filesystem hiccup in CI) can recover.
-      console.error('Failed to load googleSheets integration', err);
-    });
+  // If the helpers are already populated we can return a resolved promise
+  // immediately. This is the fast-path for the common case where the module
+  // has been imported once earlier in the process life-cycle.
+  if (formatCapturedKnowledge && appendRows) {
+    return Promise.resolve();
+  }
+
+  // Kick off the dynamic import exactly once.
+  if (!sheetsIntegrationPromise) {
+    sheetsIntegrationPromise = import('../integrations/googleSheets')
+      .then((mod) => {
+        formatCapturedKnowledge = mod.formatCapturedKnowledge as FormatCapturedKnowledgeFn;
+        appendRows = mod.appendRows as AppendRowsFn;
+      })
+      .catch((err) => {
+        // Surface the error so callers can decide whether to retry or ignore.
+        console.error('Failed to load googleSheets integration', err);
+        throw err;
+      });
+  }
+
+  // Coerce to `Promise<void>` so that callers don't rely on the imported
+  // module shape. The helpers are exposed via the cached variables.
+  return sheetsIntegrationPromise.then(() => undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -128,14 +154,10 @@ function onSlashCommand(event: ChatEvent): Record<string, unknown> {
 
         // Only attempt the Sheets write when running under Node.js.
         if (IS_NODE) {
-          // Ensure the dynamic import is kicked off.
-          ensureSheetsIntegration();
-
-          // Build the row lazily – if the module has not loaded yet we will
-          // retry on the next invocation rather than blocking user response.
           const maybeWrite = (): void => {
             if (!formatCapturedKnowledge || !appendRows) {
-              // Integration not ready yet.
+              // Integration not ready yet – this should not happen after
+              // awaiting `ensureSheetsIntegration()` but we guard just in case.
               return;
             }
 
@@ -158,18 +180,18 @@ function onSlashCommand(event: ChatEvent): Record<string, unknown> {
             }
           };
 
-          // Either run immediately (if the module was cached) or schedule once
-          // the import promise resolves.
-          if (formatCapturedKnowledge && appendRows) {
-            maybeWrite();
-          } else {
-            // Re-import to access the original promise if ensureSheetsIntegration
-            // has already been called.
-            // eslint-disable-next-line promise/catch-or-return
-            import('../integrations/googleSheets').then(maybeWrite).catch(() => {
-              /* handled in ensureSheetsIntegration() */
-            });
-          }
+          // Kick off an async task so we can await the integration promise
+          // without turning the entire slash-command handler into an async
+          // function (which would break the synchronous Apps Script contract).
+          void (async () => {
+            try {
+              await ensureSheetsIntegration();
+              maybeWrite();
+            } catch (loadErr) {
+              // Import failed – already logged inside ensureSheetsIntegration().
+              console.error('Sheets integration initialisation failed', loadErr);
+            }
+          })();
         }
 
         return createResponse({
