@@ -174,7 +174,26 @@ async function httpGet<T = unknown>(url: string, headers: Record<string, string>
 * @param threadResourceName Full resource name – e.g. "spaces/AAA/threads/BBB".
 * @returns Array of ChatMessage sorted oldest → newest.
 */
-export async function getThreadMessages(threadResourceName: string): Promise<ChatMessage[]> {
+/**
+* Fetch messages for a given Google Chat thread.
+*
+* When `limit` is provided the function retrieves **at most** that many most-recent
+* messages and therefore issues fewer network requests than fetching the entire
+* thread. Internally it requests pages in **descending** order (`orderBy=DESC`)
+* so that the first page already contains the newest messages.
+*
+* When `limit` is omitted the behaviour is unchanged – the full thread is fetched
+* in ascending order just like the original implementation.
+*
+* @param threadResourceName Full resource name – e.g. "spaces/AAA/threads/BBB".
+* @param limit Optional maximum number of messages to return (latest ⟶ oldest).
+*              Pass `Infinity` or omit for no limit.
+* @returns Array of ChatMessage sorted oldest → newest.
+*/
+export async function getThreadMessages(
+  threadResourceName: string,
+  limit: number = Infinity
+): Promise<ChatMessage[]> {
   const accessToken = getAccessToken();
   // Do not URI-encode the threadResourceName wholesale – Google APIs expect the
   // literal path (e.g. "spaces/AAA/threads/BBB"). Individual path segments are
@@ -188,13 +207,33 @@ export async function getThreadMessages(threadResourceName: string): Promise<Cha
 
   const allMessages: ChatMessage[] = [];
 
+  // If the caller requested a finite limit we can optimise the number of
+  // network round-trips by:
+  //   1. Asking the API for `orderBy=DESC` (newest first).
+  //   2. Requesting pages sized to the limit (≤100) so the first page already
+  //      contains all we need in the common case.
+
+  // Guard against non-numeric, NaN, or non-positive values.
+  // When the provided `limit` is not a finite positive integer we treat it as
+  // "no limit" to preserve the previous full-thread fetch behaviour and, more
+  // importantly, avoid sending illegal `pageSize` values (e.g. 0) to the API.
+  const safeLimit: number =
+    Number.isFinite(limit) && (limit as number) > 0 ? Math.trunc(limit as number) : Infinity;
+
+  const hasLimit = Number.isFinite(safeLimit);
+  const MAX_API_PAGE = 100;
+  const pageSize = hasLimit ? Math.min(safeLimit, MAX_API_PAGE) : MAX_API_PAGE;
+
   let pageToken: string | undefined = undefined;
-  const pageSize = 100; // Max allowed by API
 
   try {
     do {
       const url = new URL(baseUrl);
       url.searchParams.set('pageSize', String(pageSize));
+      // Use descending order when limiting so the newest messages arrive first.
+      if (hasLimit) {
+        url.searchParams.set('orderBy', 'DESC');
+      }
       if (pageToken) url.searchParams.set('pageToken', pageToken);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -221,6 +260,11 @@ export async function getThreadMessages(threadResourceName: string): Promise<Cha
         } as ChatMessage;
         allMessages.push(fullMsg);
       });
+
+      // Stop early if we have collected enough recent messages.
+      if (hasLimit && allMessages.length >= safeLimit) {
+        break;
+      }
 
       pageToken = data?.nextPageToken;
     } while (pageToken);
@@ -252,6 +296,12 @@ export async function getThreadMessages(threadResourceName: string): Promise<Cha
   // comparator never returns `NaN`, which could otherwise throw a runtime
   // error or lead to inconsistent ordering in V8.
   allMessages.sort((a, b) => toMillis(a.createTime) - toMillis(b.createTime));
+
+  if (hasLimit) {
+    // Return the last `safeLimit` items (oldest → newest) – slicing guards against
+    // the final page being larger than the requested limit.
+    return allMessages.slice(-safeLimit as number);
+  }
 
   return allMessages;
 }

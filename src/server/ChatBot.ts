@@ -23,6 +23,24 @@
 // Runtime detection helpers
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Memoised dynamic imports – GoogleChatService & LLM abstraction
+// ---------------------------------------------------------------------------
+
+/**
+* Cache objects for dynamically imported heavy modules so that `import()` is
+* executed only once per module. Subsequent calls reuse the already–resolved
+* module reference which avoids repeated module graph construction (and
+* potential network/disk latency when running in a non-bundled Node.js
+* environment such as tests).
+*/
+
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+let chatServiceModule: typeof import('../services/GoogleChatService') | null = null;
+
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+let llmModule: typeof import('../llm/index') | null = null;
+
 /**
 * Very small feature-flag that tells us whether we are executing inside a
 * Node.js process. When bundled for Apps Script the global `process` object is
@@ -101,11 +119,66 @@ function createResponse({ text }: { text: string; event?: ChatEvent }): Record<s
 }
 
 /**
-* Default onMessage handler – currently echoes a placeholder response.
+* onMessage – entry point for non slash-command MESSAGE events.
+*
+* Fetches recent thread context, builds a prompt, calls the LLM abstraction
+* to generate a helpful and concise reply, and returns the response in the
+* format expected by Google Chat.
 */
-function onMessage(event: ChatEvent): Record<string, unknown> {
-  const userText = event?.message?.text ?? '';
-  return createResponse({ text: `You said: "${userText}"` });
+async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | null> {
+  // Ignore slash-command events entirely.
+  if (event?.message?.slashCommand) {
+    // Returning `null` tells the caller that no response should be sent back to
+    // Google Chat. An empty `text` payload would still create a visible blank
+    // message in the UI, whereas `null` cleanly suppresses any reply.
+    return null;
+  }
+
+  const threadName: string | undefined = event?.message?.thread?.name;
+
+  // If we somehow receive a non-threaded message, fallback to simple echo.
+  if (!threadName) {
+    const userText = event?.message?.text ?? '';
+    return createResponse({ text: `You said: "${userText}"` });
+  }
+
+  try {
+    // Dynamically import heavy deps – memoised so the import executes only
+    // once per module across the lifetime of the process.
+
+    if (!chatServiceModule) {
+      chatServiceModule = await import('../services/GoogleChatService');
+    }
+    if (!llmModule) {
+      llmModule = await import('../llm/index');
+    }
+
+    const { getThreadMessages } = chatServiceModule;
+    const { generateText } = llmModule;
+
+    const contextWindow = 10;
+    // Fetch only the last `contextWindow` messages using the optimised
+    // pagination provided by GoogleChatService.
+    const recent = await getThreadMessages(threadName, contextWindow);
+
+    const SYSTEM_INST = 'You are a helpful and concise AI assistant.';
+
+    const lines: string[] = [];
+    for (const msg of recent) {
+      if (!msg.text) continue;
+      const speaker = msg.isAiBot ? 'Assistant' : msg.sender?.displayName || 'User';
+      lines.push(`${speaker}: ${msg.text}`);
+    }
+
+    const prompt = `${SYSTEM_INST}\n\n${lines.join('\n')}\nAssistant:`;
+
+    const aiReply = await generateText(prompt);
+
+    return createResponse({ text: aiReply });
+  } catch (err) {
+    console.error('onMessage AI reply error', err);
+    return createResponse({ text: 'Sorry - I encountered an error while replying.' });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +302,7 @@ async function doPost(
     if (event?.message?.slashCommand) {
       response = await onSlashCommand(event);
     } else if (event?.type === 'MESSAGE') {
-      response = onMessage(event);
+      response = await onMessage(event);
     }
 
     return ContentService.createTextOutput(
