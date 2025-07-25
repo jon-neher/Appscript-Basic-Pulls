@@ -141,7 +141,10 @@ export async function appendRows(
       // Only retry on rate limits (429) or server errors (>=500).
       const code: number | undefined = err?.response?.status ?? err?.code ?? err?.status;
       if (code && (code === 429 || code >= 500)) {
-        const delayMs = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s ...
+        // Exponential back-off: 1s, 2s, 4s …
+        // `attempt` is incremented **before** computing the delay, so we need
+        // to subtract 1 to start at 1 second (2^0 * 1000).
+        const delayMs = Math.pow(2, attempt - 1) * 1000;
         await new Promise((res) => setTimeout(res, delayMs));
         // eslint-disable-next-line no-continue
         continue;
