@@ -173,12 +173,17 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | nu
 
     // Token budgeting --------------------------------------------------
 
-    // The underlying model (gpt-3.5-turbo) offers a hard 4 096-token context
-    // window.  We reserve a fixed slice (≈512) for:
+    // Our default OpenAI model (`gpt-4o-mini`) can accommodate **much** larger
+    // prompts (≈128 000-token context window at the time of writing).  For the
+    // sake of latency, cost control, and backward-compatibility with smaller
+    // models we *intentionally* cap the effective context to **4 096 tokens**.
+    //
+    // We then reserve a fixed slice (≈512 tokens) for:
     //   • the system instruction
     //   • the assistant’s forthcoming answer
-    //   • miscellaneous over-heads (JSON, stop-tokens, etc.)
-    // Everything else is available for *conversation history*.
+    //   • miscellaneous overhead (role labels, JSON wrapper, stop-tokens …)
+    //
+    // The remaining ~3 584 tokens are available for *conversation history*.
 
     const MODEL_CONTEXT_LIMIT = 4096;
     const RESERVED_FOR_SYSTEM_AND_REPLY = 512;

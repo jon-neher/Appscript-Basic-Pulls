@@ -183,7 +183,7 @@ environment variables required.
 | OPENAI_API_KEY | string | conditional | Required when `LLM_PROVIDER === 'openai'`. |
 | GEMINI_API_KEY | string | conditional | Required when `LLM_PROVIDER === 'gemini'`. |
 | OPENAI_ENDPOINT | `'chat' \| 'responses'` | optional | Defaults to `'chat'`. `'responses'` routes all requests to the OpenAI **Responses** v1 endpoint instead of Chat Completions. |
-| OPENAI_MODEL_ID | string | optional | Defaults to `'gpt-3.5-turbo'`. |
+| OPENAI_MODEL_ID | string | optional | Defaults to `'gpt-4o-mini'`. |
 | GEMINI_MODEL_ID | string | optional | Defaults to `'gemini-pro'`. |
 | RESPONSES_BETA | boolean | optional | Include `OpenAI-Beta: responses=v1` header when using responses endpoint. Defaults to `false`. |
 
