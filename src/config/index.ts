@@ -135,12 +135,21 @@ export function getConfig(key: string, opts: GetConfigOptions = {}): string | un
     key in (process as any).env
   ) {
     val = (process as any).env[key] as string | undefined;
+
+    // Normalise: treat purely-whitespace strings as empty
+    if (typeof val === 'string') {
+      val = val.trim();
+    }
   }
 
   // 2) Apps Script – fetch from Script Properties using the cached helper.
   if (val === undefined || val === '') {
     try {
       val = readFromScriptProperties(key);
+
+      if (typeof val === 'string') {
+        val = val.trim();
+      }
     } catch (err) {
       // Suppress the *expected* ReferenceError when the GAS global is absent
       // (e.g. running under Node). Any other error is surfaced to logs to aid
@@ -157,7 +166,7 @@ export function getConfig(key: string, opts: GetConfigOptions = {}): string | un
 
   // 3) Fallback literal
   if ((val === undefined || val === '') && typeof fallback === 'string') {
-    val = fallback;
+    val = fallback.trim();
   }
 
   // Validation – execute **only** when the key is present (undefined handled earlier)
