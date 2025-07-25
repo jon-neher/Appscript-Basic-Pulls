@@ -87,6 +87,8 @@ export async function generateText(
 // Provider helpers
 // ---------------------------------------------------------------------------
 
+import { getConfig } from '../config/index';
+
 /** Determine the runtime environment and perform a JSON HTTP POST. */
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 async function httpPostJson(
@@ -160,26 +162,13 @@ async function httpPostJson(
   throw new Error('No compatible HTTP client (fetch / UrlFetchApp) found.');
 }
 
-/** Convenience helper to read a key from env or Apps Script properties. */
+/**
+* Thin wrapper around the shared config module that preserves the previous
+* return-type (`string | undefined`). Keeps the surrounding code changes
+* minimal while we migrate callers.
+*/
 function readConfig(key: string): string | undefined {
-  // 1) Node / Cloud environment
-  if (typeof process !== 'undefined' && process.env && key in process.env) {
-    return process.env[key];
-  }
-
-  // 2) Google Apps Script `PropertiesService`
-  try {
-    if (
-      typeof PropertiesService !== 'undefined' &&
-      PropertiesService.getScriptProperties
-    ) {
-      return PropertiesService.getScriptProperties().getProperty(key) ?? undefined;
-    }
-  } catch (_) {
-    /* swallow — likely running outside GAS */
-  }
-
-  return undefined;
+  return getConfig(key, { required: false });
 }
 
 // ------------------------------ OpenAI --------------------------------------

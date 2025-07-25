@@ -169,45 +169,43 @@ Feel free to adjust column widths, enable text wrapping, or add filters – the
 integration uses the `USER_ENTERED` valueInputOption so formatting is
 preserved.
 
-## Configuration Options
-
-All configuration now lives in a single file: `src/Config.gs`. Edit the
-constants in that file and push with `clasp push`—no JSON, YAML, or
 environment variables required.
+## Configuration
 
-| Key | Type | Required | Constraints |
-|-----|------|----------|-------------|
-| DOCUMENTATION_BASE_URL | string (URL) | ✅ | Must start with `http://` or `https://`. |
-| PAGE_ANALYSIS_LIMIT | integer | ✅ | 1 ≤ value ≤ 1000 |
-| LLM_PROVIDER | `'openai' \| 'gemini'` | ✅ | — |
-| OPENAI_API_KEY | string | conditional | Required when `LLM_PROVIDER === 'openai'`. |
-| GEMINI_API_KEY | string | conditional | Required when `LLM_PROVIDER === 'gemini'`. |
-| OPENAI_ENDPOINT | `'chat' \| 'responses'` | optional | Defaults to `'chat'`. `'responses'` routes all requests to the OpenAI **Responses** v1 endpoint instead of Chat Completions. |
-| OPENAI_MODEL_ID | string | optional | Defaults to `'gpt-4o-mini'`. |
-| GEMINI_MODEL_ID | string | optional | Defaults to `'gemini-pro'`. |
-| RESPONSES_BETA | boolean | optional | Include `OpenAI-Beta: responses=v1` header when using responses endpoint. Defaults to `false`. |
+All secrets and runtime options are now resolved via a **single** helper:
 
-Validation runs at **load-time**—a bad value throws an Error before the bot can
-process any Chat events. Because configuration is checked synchronously there
-is no need for network reachability tests or external file parsing.
+```ts
+import { getConfig } from './src/config';
 
-
-### Quick-start: Switch to the OpenAI *Responses* API
-
-If you want every LLM call to hit the brand-new [Responses v1 endpoint](https://platform.openai.com/docs/api-reference/responses/create) simply tweak two keys in `src/Config.gs`:
-
-```js
-const CONFIG = {
-  // …existing required keys…
-
-  OPENAI_ENDPOINT: 'responses', // route traffic to /v1/responses
-  RESPONSES_BETA: true,        // add the required beta header (only while the endpoint is in beta)
-};
+const apiKey = getConfig('OPENAI_API_KEY');
 ```
 
-No code changes are necessary—`sendThreadForUnderstanding()` will automatically
-convert the chat history into a single prompt string and call the new
-endpoint.
+The helper transparently looks up the key in:
+
+1. `process.env` (Node/Jest)
+2. `PropertiesService.getScriptProperties()` (Apps Script)
+
+and throws a descriptive error when a *required* value is missing.
+
+### Required keys
+
+| Key | Purpose | Notes |
+|-----|---------|-------|
+| `OPENAI_API_KEY` | Authentication for OpenAI LLM calls | **Required** when using the OpenAI provider |
+| `SHEETS_SPREADSHEET_ID` | Target spreadsheet id for captured knowledge | e.g. `1AbCdEf...` |
+| `GOOGLE_CHAT_ACCESS_TOKEN` | OAuth token for Google Chat API *when running tests locally* | Not required in Apps Script (ScriptApp token is used) |
+
+### Optional keys
+
+| Key | Purpose | Default |
+|-----|---------|---------|
+| `OPENAI_ENDPOINT` | Override the HTTPS endpoint for OpenAI | `https://api.openai.com/v1/chat/completions` |
+| `OPENAI_MODEL_ID` | Default model id | `gpt-4o-mini` |
+| `AI_BOT_USER_ID` | Resource name for the AI bot user | — |
+| `AI_BOT_DISPLAY_NAME` | Display name fallback for the AI bot | — |
+
+> **Tip**: Any additional key accessed via `getConfig()` automatically inherits
+> the same lookup semantics—no code changes required.
 
 
 ## TypeScript & esbuild build pipeline (2025-07)
