@@ -45,17 +45,3 @@ Type `/capture-knowledge` in any Chat thread. The bot confirms and stores the th
 - `clasp logs` – view execution logs
 
 ## Contributing
-
-
-
-inal `.gs` files have been migrated to TypeScript under
-> `src/server/`. Tests now import the configuration through
-> `src/config/nodeConfig.js`, so `npm test` still works out-of-the-box.
-
-
-## Architecture & UX Patterns
-
-- [Ack → Action Flow](docs/ack-action-flow.md)
-
-
-
