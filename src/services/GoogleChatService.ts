@@ -213,9 +213,16 @@ export async function getThreadMessages(
   //   2. Requesting pages sized to the limit (≤100) so the first page already
   //      contains all we need in the common case.
 
-  const hasLimit = Number.isFinite(limit);
+  // Guard against non-numeric, NaN, or non-positive values.
+  // When the provided `limit` is not a finite positive integer we treat it as
+  // "no limit" to preserve the previous full-thread fetch behaviour and, more
+  // importantly, avoid sending illegal `pageSize` values (e.g. 0) to the API.
+  const safeLimit: number =
+    Number.isFinite(limit) && (limit as number) > 0 ? Math.trunc(limit as number) : Infinity;
+
+  const hasLimit = Number.isFinite(safeLimit);
   const MAX_API_PAGE = 100;
-  const pageSize = hasLimit ? Math.min(Math.trunc(limit as number), MAX_API_PAGE) : MAX_API_PAGE;
+  const pageSize = hasLimit ? Math.min(safeLimit, MAX_API_PAGE) : MAX_API_PAGE;
 
   let pageToken: string | undefined = undefined;
 
@@ -254,8 +261,8 @@ export async function getThreadMessages(
         allMessages.push(fullMsg);
       });
 
-      // Stop early if we have enough recent messages.
-      if (hasLimit && allMessages.length >= limit) {
+      // Stop early if we have collected enough recent messages.
+      if (hasLimit && allMessages.length >= safeLimit) {
         break;
       }
 
@@ -291,9 +298,9 @@ export async function getThreadMessages(
   allMessages.sort((a, b) => toMillis(a.createTime) - toMillis(b.createTime));
 
   if (hasLimit) {
-    // Return the last `limit` items (oldest → newest) – slicing guards against
+    // Return the last `safeLimit` items (oldest → newest) – slicing guards against
     // the final page being larger than the requested limit.
-    return allMessages.slice(-limit as number);
+    return allMessages.slice(-safeLimit as number);
   }
 
   return allMessages;
