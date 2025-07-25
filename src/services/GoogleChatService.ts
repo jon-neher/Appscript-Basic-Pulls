@@ -14,7 +14,13 @@
 * sender matches the configured AI-bot identity.
 */
 
-// Note: avoid global ESLint disables. Only locally suppress unavoidable `any`.
+// NOTE: We previously disabled `@typescript-eslint/no-explicit-any` for the entire
+// file.  That blanket disable hid potentially unsafe `any` usages and could allow
+// accidental regressions. We now scope the rule to the handful of intentional
+// places where `any` is truly necessary (dynamic JSON parsing, unknown
+// third-party payloads, etc.) by inserting `eslint-disable-next-line
+// @typescript-eslint/no-explicit-any` comments immediately before each
+// occurrence.
 
 // ---------------------------------------------------------------------------
 // Type definitions
@@ -238,7 +244,9 @@ export async function getThreadMessages(threadResourceName: string): Promise<Cha
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
-  // Sort chronologically (oldest first)
+  // Sort chronologically (oldest → newest). Using `toMillis` guarantees the
+  // comparator never returns `NaN`, which could otherwise throw a runtime
+  // error or lead to inconsistent ordering in V8.
   allMessages.sort((a, b) => toMillis(a.createTime) - toMillis(b.createTime));
 
   return allMessages;
