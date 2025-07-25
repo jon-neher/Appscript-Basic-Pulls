@@ -1,0 +1,135 @@
+# GitHub Actions CI
+#
+# This workflow installs dependencies, runs the Jest test suite, and — when the
+# build comes from the default branch (`main`) — pushes the latest build to the
+# attached Google Apps Script project using `clasp`, then creates/updates the
+# production deployment.
+#
+# It expects the following repository secrets to be configured:
+#   - CLASP_CLIENT_ID
+#   - CLASP_CLIENT_SECRET
+#   - CLASP_REFRESH_TOKEN
+#   - SCRIPT_ID
+#
+# To keep within the `clasp deploy` quota (20 calls/min) we gate the
+# deploy job behind a single concurrency group so that only one deployment can
+# run at a time, even if several commits land in quick succession.
+#
+# Protect the `main` branch by requiring the status check for this workflow to
+# pass before allowing merges. (Branch protection is configured in the GitHub
+# UI and is documented here for clarity.)
+
+name: CI / Test → Clasp push → Deploy
+
+on:
+  # Always run for pull-requests so that tests gate merges.
+  pull_request:
+  # Also run on direct pushes in case maintainers commit straight to a branch.
+  push:
+    branches:
+      - '**' # run on all branches so PRs get test feedback
+
+concurrency:
+  # Cancel redundant workflow runs triggered on the same branch/PR to avoid
+  # wasting CI minutes. Deploys themselves are further serialized in the
+  # `deploy` job via its own concurrency group.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Ensure npm installs the exact, locked dependency tree.
+  CI: 'true'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js (LTS 18)
+        uses: actions/setup-node@v4
+        with:
+          # Pin to the current LTS (18) for maximum runner availability.
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        run: npm test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    # Only one deploy may run at a time to stay below the 20-per-minute quota.
+    concurrency:
+      group: clasp-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js (LTS 18)
+        uses: actions/setup-node@v4
+        with:
+          # Pin to the current LTS (18) to match the test job.
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project (esbuild)
+        run: npm run build
+
+      - name: Configure clasp authentication
+        env:
+          CLASP_CLIENT_ID: ${{ secrets.CLASP_CLIENT_ID }}
+          CLASP_CLIENT_SECRET: ${{ secrets.CLASP_CLIENT_SECRET }}
+          CLASP_REFRESH_TOKEN: ${{ secrets.CLASP_REFRESH_TOKEN }}
+        run: |
+          # Write the ~/.clasprc.json file expected by `clasp` using the
+          # provided OAuth client and refresh token. We omit an `access_token`
+          # – clasp will exchange the refresh token for one automatically.
+          mkdir -p "$HOME"
+          cat > "$HOME/.clasprc.json" <<JSON
+          {
+            "token": {
+              "refresh_token": "${CLASP_REFRESH_TOKEN}",
+              "access_token": "",
+              "scope": "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/script.projects https://www.googleapis.com/auth/script.deployments https://www.googleapis.com/auth/script.scriptapp",
+              "token_type": "Bearer",
+              "expiry_date": 0
+            },
+            "oauth2ClientId": "${CLASP_CLIENT_ID}",
+            "oauth2ClientSecret": "${CLASP_CLIENT_SECRET}",
+            "isLocalCreds": true
+          }
+          JSON
+
+      - name: Prepare .clasp.json with Script ID
+        env:
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+        run: |
+          cp .clasp.json.example .clasp.json
+          # Replace placeholder with the real Apps Script ID supplied via secret.
+          sed -i "s/YOUR_SCRIPT_ID/${SCRIPT_ID}/" .clasp.json
+
+      - name: Push code to Apps Script project
+        run: npx clasp push --rootDir dist --force
+
+      - name: Deploy production version
+        run: npx clasp deploy --description "CI deploy $GITHUB_SHA"
+
+      # Tidy up credentials so they don’t linger in the runner’s workspace or
+      # get uploaded by a subsequent action.
+
+      - name: Remove sensitive files
+        if: always()
+        run: |
+          rm -f "$HOME/.clasprc.json" .clasp.json
