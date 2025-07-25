@@ -13,6 +13,51 @@ The project uses the [Google clasp CLI](https://github.com/google/clasp) for loc
 
 ## Getting started
 
+### Clasp CLI setup (first time only)
+
+1. **Install clasp globally (optional)** – if you prefer a global binary:
+
+   ```bash
+   npm install -g @google/clasp
+   ```
+
+   _Tip: the repo already includes a local copy under `node_modules/.bin/clasp`, so you can also run it via the provided npm scripts without a global install._
+
+2. **Authenticate with Google**:
+
+   ```bash
+   npm run login
+   ```
+
+   This opens a browser window so you can grant clasp access to your Google account. The OAuth token is stored in `~/.clasprc.json`.
+
+3. **Create your local `.clasp.json`**:
+
+   ```bash
+   cp .clasp.json.example .clasp.json
+   # then edit .clasp.json and paste your Script ID
+   ```
+
+   You can find the Script ID in the Apps Script editor under **Project Settings → Script ID**. Keep this file out of public repos if it points to a private project!
+
+4. **Verify connectivity**:
+
+   ```bash
+   npm run logs -- --help  # should print the clasp logs help text
+   ```
+
+Once `.clasp.json` is in place the following convenience scripts are available:
+
+| Script   | What it does                                               |
+|----------|------------------------------------------------------------|
+| `push`   | Upload the contents of `src/` (or `dist/` after a build)   |
+| `pull`   | Download the latest remote files into your local tree      |
+| `deploy` | Create **or update** a versioned deployment                |
+| `logs`   | Stream execution logs in real-time                         |
+
+All scripts are thin wrappers around their equivalent `clasp <command>` counterparts to avoid memorizing flags.
+
+
 1. **Install dependencies**
 
    ```bash
