@@ -20,7 +20,8 @@
     "axios": "^1.6.0",
     "cheerio": "^1.0.0-rc.12",
     "p-map": "^6.0.0",
-    "undici": "^6.21.3"
+    "undici": "^6.21.3",
+    "googleapis": "^132.0.0"
   },
   "devDependencies": {
     "@google/clasp": "^2.5.0",

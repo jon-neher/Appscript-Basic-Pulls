@@ -6,6 +6,12 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+// ---------------------------------------------------------------------------
+// Imports
+// ---------------------------------------------------------------------------
+
+import { formatCapturedKnowledge, appendRows } from '../integrations/googleSheets';
+
 type ChatEvent = any; // Inline type placeholder – Apps Script runtime provides dynamic payload.
 
 /**
@@ -52,7 +58,28 @@ function onSlashCommand(event: ChatEvent) {
         const spaceId = spaceName.split('/').pop() || spaceName;
         const threadId = threadName.split('/').pop() || threadName;
 
-        // In future this context will be persisted (VEN-26). For now, just acknowledge.
+        // Persist basic metadata to Google Sheets (VEN-36). Full thread snapshot
+        // will be added in a future task once the conversation fetch pipeline
+        // is wired up end-to-end.
+
+        try {
+          const knowledgeRow = formatCapturedKnowledge({
+            timestamp: new Date().toISOString(),
+            source: `${spaceId}/${threadId}`,
+            content: `Thread captured via /capture-knowledge (thread ${threadId})`,
+            tags: ['chat'],
+          });
+
+          // Fire-and-forget to keep the Chat latency low – errors are logged
+          // asynchronously and do NOT affect the immediate user response.
+          void appendRows([knowledgeRow]).catch((err) =>
+            console.error('Sheets append error', err)
+          );
+        } catch (sheetErr) {
+          // Don’t fail the command for Sheets errors – just log them.
+          console.error('googleSheets integration error', sheetErr);
+        }
+
         return createResponse({
           text: `Got it – captured context for thread ${threadId} in space ${spaceId}.`,
         });
