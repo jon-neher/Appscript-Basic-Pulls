@@ -103,9 +103,47 @@ function createResponse({ text }: { text: string; event?: ChatEvent }): Record<s
 /**
 * Default onMessage handler – currently echoes a placeholder response.
 */
-function onMessage(event: ChatEvent): Record<string, unknown> {
-  const userText = event?.message?.text ?? '';
-  return createResponse({ text: `You said: "${userText}"` });
+async function onMessage(event: ChatEvent): Promise<Record<string, unknown>> {
+  // Ignore slash-command events entirely.
+  if (event?.message?.slashCommand) {
+    return createResponse({ text: '' });
+  }
+
+  const threadName: string | undefined = event?.message?.thread?.name;
+
+  // If we somehow receive a non-threaded message, fallback to simple echo.
+  if (!threadName) {
+    const userText = event?.message?.text ?? '';
+    return createResponse({ text: `You said: "${userText}"` });
+  }
+
+  try {
+    // Dynamically import heavy deps so that the Apps Script bundle stays slim.
+    const { getThreadMessages } = await import('../services/GoogleChatService');
+    const { generateText } = await import('../llm/index');
+
+    const allMessages = await getThreadMessages(threadName);
+    const contextWindow = 10;
+    const recent = allMessages.slice(-contextWindow);
+
+    const SYSTEM_INST = 'You are a helpful and concise AI assistant.';
+
+    const lines: string[] = [];
+    for (const msg of recent) {
+      if (!msg.text) continue;
+      const speaker = msg.isAiBot ? 'Assistant' : msg.sender?.displayName || 'User';
+      lines.push(`${speaker}: ${msg.text}`);
+    }
+
+    const prompt = `${SYSTEM_INST}\n\n${lines.join('\n')}\nAssistant:`;
+
+    const aiReply = await generateText(prompt);
+
+    return createResponse({ text: aiReply });
+  } catch (err) {
+    console.error('onMessage AI reply error', err);
+    return createResponse({ text: 'Sorry — I encountered an error while replying.' });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +267,7 @@ async function doPost(
     if (event?.message?.slashCommand) {
       response = await onSlashCommand(event);
     } else if (event?.type === 'MESSAGE') {
-      response = onMessage(event);
+      response = await onMessage(event);
     }
 
     return ContentService.createTextOutput(
