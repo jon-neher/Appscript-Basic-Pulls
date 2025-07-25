@@ -36,6 +36,58 @@ declare const PropertiesService: {
 } | undefined;
 
 // ---------------------------------------------------------------------------
+// Module-scope cache for GAS `Script Properties`
+// ---------------------------------------------------------------------------
+
+/*
+* Repeated calls to `PropertiesService.getScriptProperties()` incur a quota
+* cost on Apps Script. Because script-properties are effectively immutable at
+* runtime we can safely cache the handle for the lifetime of this module.
+*/
+
+let cachedScriptProperties: { getProperty(key: string): string | null } | null = null;
+
+/**
+* Read a key from GAS script properties, with lazy initialisation + caching.
+*
+* When executed in a non-GAS runtime (`PropertiesService` undefined) the
+* function returns `undefined` without side-effects.
+*
+* Any unexpected runtime errors (quota issues, etc.) are not swallowed – they
+* are surfaced via `console.warn()` so that callers have a breadcrumb while
+* still allowing execution to continue with fallback logic.
+*/
+function readFromScriptProperties(key: string): string | undefined {
+  try {
+    // Detect non-GAS runtimes first to avoid the `ReferenceError` thrown when
+    // merely *accessing* an undefined global.
+    if (typeof PropertiesService === 'undefined' || !PropertiesService?.getScriptProperties) {
+      return undefined;
+    }
+
+    // Lazily initialise & cache the script-properties service.
+    if (!cachedScriptProperties) {
+      cachedScriptProperties = PropertiesService.getScriptProperties();
+    }
+
+    return cachedScriptProperties.getProperty(key) ?? undefined;
+  } catch (err) {
+    // Suppress the expected ReferenceError raised when the code is bundled for
+    // Node/Jest (no `PropertiesService` global). Surface everything else.
+    if (err instanceof ReferenceError) {
+      return undefined;
+    }
+
+    // eslint-disable-next-line no-console
+    console.warn(
+      'getConfig(): unexpected error while reading Script Properties – proceeding with fallback',
+      err,
+    );
+    return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -79,18 +131,9 @@ export function getConfig(key: string, opts: GetConfigOptions = {}): string | un
     val = (process as any).env[key] as string | undefined;
   }
 
-  // 2) Apps Script – guarded to avoid ReferenceError when compiled for Node.
+  // 2) Apps Script – only when value still unresolved / empty.
   if (val === undefined || val === '') {
-    try {
-      if (
-        typeof PropertiesService !== 'undefined' &&
-        PropertiesService?.getScriptProperties
-      ) {
-        val = PropertiesService.getScriptProperties().getProperty(key) ?? undefined;
-      }
-    } catch (_) {
-      /* swallow – likely running outside GAS */
-    }
+    val = readFromScriptProperties(key);
   }
 
   // 3) Fallback literal
