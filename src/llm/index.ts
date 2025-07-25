@@ -108,7 +108,12 @@ async function httpPostJson(
     });
 
     if (res.status >= 400) {
-      throw new Error(`HTTP ${res.status} – ${JSON.stringify(res.data)}`);
+      // Avoid leaking potentially sensitive provider response bodies in production logs.
+      // Surface full details only during local development where NODE_ENV === 'development'.
+      const safeMessage = process.env.NODE_ENV === 'development'
+        ? JSON.stringify(res.data)
+        : '[response truncated]';
+      throw new Error(`HTTP ${res.status} – ${safeMessage}`);
     }
 
     return res.data;
