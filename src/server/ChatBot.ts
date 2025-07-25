@@ -27,7 +27,9 @@ function onMessage(event: ChatEvent) {
 * Handle slash-command events from Google Chat.
 */
 function onSlashCommand(event: ChatEvent) {
-  const commandId: number = event?.message?.slashCommand?.commandId as number;
+  // `commandId` is a numeric literal (per manifest) but we allow string literals for legacy
+  // internal commands such as "ping".
+  const commandId = event?.message?.slashCommand?.commandId as number | string;
 
   switch (commandId) {
     // ---------------------------------------------------------------------
@@ -64,6 +66,11 @@ function onSlashCommand(event: ChatEvent) {
       }
     }
 
+    // ------------------------------------------------------------------
+    // Example placeholder command – responds with pong.
+    // ------------------------------------------------------------------
+    case 'ping':
+      return createResponse({ text: 'pong' });
 
     default:
       // Unknown command.
