@@ -14,7 +14,7 @@
 * sender matches the configured AI-bot identity.
 */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// Note: avoid global ESLint disables. Only locally suppress unavoidable `any`.
 
 // ---------------------------------------------------------------------------
 // Type definitions
@@ -27,8 +27,10 @@ export interface ChatMessage {
   sender?: {
     name?: string; // e.g. "users/123456789"
     displayName?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
   };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 
   /**
@@ -75,6 +77,7 @@ function getAccessToken(): string {
 *   – Environment variables (for local tests / CI):
 *       process.env.AI_BOT_USER_ID, process.env.AI_BOT_DISPLAY_NAME
 */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function isAiBotSender(sender: any): boolean {
   if (!sender) return false;
 
@@ -125,14 +128,17 @@ async function httpGet<T = unknown>(url: string, headers: Record<string, string>
 
       const status = response.getResponseCode();
       const text = response.getContentText();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let parsed: any = undefined;
       try {
         parsed = JSON.parse(text);
       } catch (jsonErr) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         parsed = text as any;
       }
 
       return { status, data: parsed } as HttpResponse<T>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       throw err;
     }
@@ -181,6 +187,7 @@ export async function getThreadMessages(threadResourceName: string): Promise<Cha
       url.searchParams.set('pageSize', String(pageSize));
       if (pageToken) url.searchParams.set('pageToken', pageToken);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { status, data } = await httpGet<{ messages?: any[]; nextPageToken?: string }>(
         url.toString(),
         headers
@@ -196,6 +203,7 @@ export async function getThreadMessages(threadResourceName: string): Promise<Cha
 
       const messages = data?.messages ?? [];
       // Augment with isAiBot flag
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       messages.forEach((msg: any) => {
         const fullMsg: ChatMessage = {
           ...msg,
@@ -206,6 +214,7 @@ export async function getThreadMessages(threadResourceName: string): Promise<Cha
 
       pageToken = data?.nextPageToken;
     } while (pageToken);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     // Attempt to include status & payload if available
     if (err?.status) {
@@ -221,12 +230,16 @@ export async function getThreadMessages(threadResourceName: string): Promise<Cha
     throw err; // re-throw so caller knows it failed
   }
 
+  // Helper to safely convert an ISO/RFC3339 timestamp string to milliseconds.
+  // Returns 0 when the input is missing or unparsable so the comparator always
+  // yields a finite number (Array.sort comparator must not return NaN).
+  const toMillis = (iso?: string): number => {
+    const parsed = iso ? Date.parse(iso) : NaN;
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   // Sort chronologically (oldest first)
-  allMessages.sort((a, b) => {
-    const aTime = a.createTime ? Date.parse(a.createTime) : 0;
-    const bTime = b.createTime ? Date.parse(b.createTime) : 0;
-    return aTime - bTime;
-  });
+  allMessages.sort((a, b) => toMillis(a.createTime) - toMillis(b.createTime));
 
   return allMessages;
 }

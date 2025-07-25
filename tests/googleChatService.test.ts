@@ -1,7 +1,3 @@
-// This test file targets Node.js runtime – include Node type defs.
-// Declare Node globals for TypeScript without bringing in full @types/node dep
-declare const process: any;
-
 import * as nock from 'nock';
 
 import { getThreadMessages } from '../src/services/GoogleChatService';
