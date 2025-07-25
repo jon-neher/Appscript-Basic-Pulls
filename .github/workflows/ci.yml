@@ -50,9 +50,8 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          # The project currently uses Node v22 locally. GitHub runners have 22
-          # available – if not, fall back to the newest LTS (v20).
-          node-version: 22
+          # Use Node.js 18 (LTS) for test run to match supported runner images.
+          node-version: 18
           cache: 'npm'
 
       - name: Install dependencies
@@ -78,7 +77,8 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Use the same Node.js 18 LTS version for deployment steps.
+          node-version: 18
           cache: 'npm'
 
       - name: Install dependencies
