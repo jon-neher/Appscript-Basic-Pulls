@@ -69,8 +69,21 @@ export function buildContextWindow<T extends MessageLike>(
   fullMessages: T[],
   maxTokens: number,
 ): T[] {
-  // Guard against non-positive budgets – treat as “no room for any messages”.
-  if (!Number.isFinite(maxTokens) || maxTokens <= 0) {
+  // ---------------------------------------------------------------------
+  // Budget guards
+  // ---------------------------------------------------------------------
+
+  // 0. Treat positive Infinity as *unlimited* budget – return a shallow copy
+  //    so callers cannot mutate the input array.
+  if (maxTokens === Infinity) {
+    // Unlimited budget: return all messages in chronological order.
+    return fullMessages.slice();
+  }
+
+  // 1. Guard against non-positive or non-finite budgets (NaN, -Infinity) –
+  //    treat as “no room for any messages”. Positive Infinity is handled
+  //    above.
+  if (maxTokens <= 0 || !Number.isFinite(maxTokens)) {
     return [];
   }
 
