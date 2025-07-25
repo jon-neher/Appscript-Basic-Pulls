@@ -5,7 +5,7 @@
 * A stub branch exists for the upcoming Gemini integration.
 */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 
 export type SupportedProvider = 'openai' | 'gemini';
 
@@ -88,6 +88,7 @@ export async function generateText(
 // ---------------------------------------------------------------------------
 
 /** Determine the runtime environment and perform a JSON HTTP POST. */
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 async function httpPostJson(
   url: string,
   headers: Record<string, string>,
