@@ -7,7 +7,7 @@ describe('/capture-knowledge slash command', () => {
     message: {
       text: '/capture-knowledge',
       thread: { name: 'spaces/AAAA/threads/BBBB' },
-      slashCommand: { commandId: 'capture-knowledge' },
+      slashCommand: { commandId: 2 },
     },
   } as any;
 

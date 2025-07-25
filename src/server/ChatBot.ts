@@ -27,13 +27,13 @@ function onMessage(event: ChatEvent) {
 * Handle slash-command events from Google Chat.
 */
 function onSlashCommand(event: ChatEvent) {
-  const commandId: string = event?.message?.slashCommand?.commandId ?? '';
+  const commandId: number = event?.message?.slashCommand?.commandId as number;
 
   switch (commandId) {
     // ---------------------------------------------------------------------
     // VEN-25 – /capture-knowledge
     // ---------------------------------------------------------------------
-    case 'capture-knowledge': {
+    case 2: {
       try {
         const spaceName: string | undefined = event?.space?.name;
         const threadName: string | undefined = event?.message?.thread?.name;
@@ -64,11 +64,6 @@ function onSlashCommand(event: ChatEvent) {
       }
     }
 
-    // ------------------------------------------------------------------
-    // Example placeholder command – responds with pong.
-    // ------------------------------------------------------------------
-    case 'ping':
-      return createResponse({ text: 'pong' });
 
     default:
       // Unknown command.
