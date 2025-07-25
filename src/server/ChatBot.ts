@@ -153,9 +153,10 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown>> {
     const { getThreadMessages } = chatServiceModule;
     const { generateText } = llmModule;
 
-    const allMessages = await getThreadMessages(threadName);
     const contextWindow = 10;
-    const recent = allMessages.slice(-contextWindow);
+    // Fetch only the last `contextWindow` messages using the optimised
+    // pagination provided by GoogleChatService.
+    const recent = await getThreadMessages(threadName, contextWindow);
 
     const SYSTEM_INST = 'You are a helpful and concise AI assistant.';
 

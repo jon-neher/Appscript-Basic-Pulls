@@ -23,7 +23,7 @@ describe('ChatBot.onMessage - AI reply generation', () => {
     // ---------------------------------------------------
     nock(chatBase)
       .get(threadPath)
-      .query((q) => q.pageSize === '100' && !q.pageToken)
+      .query((q) => q.pageSize === '10' && q.orderBy === 'DESC' && !q.pageToken)
       .reply(200, {
         messages: [
           {
