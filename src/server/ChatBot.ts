@@ -125,10 +125,13 @@ function createResponse({ text }: { text: string; event?: ChatEvent }): Record<s
 * to generate a helpful and concise reply, and returns the response in the
 * format expected by Google Chat.
 */
-async function onMessage(event: ChatEvent): Promise<Record<string, unknown>> {
+async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | null> {
   // Ignore slash-command events entirely.
   if (event?.message?.slashCommand) {
-    return createResponse({ text: '' });
+    // Returning `null` tells the caller that no response should be sent back to
+    // Google Chat. An empty `text` payload would still create a visible blank
+    // message in the UI, whereas `null` cleanly suppresses any reply.
+    return null;
   }
 
   const threadName: string | undefined = event?.message?.thread?.name;

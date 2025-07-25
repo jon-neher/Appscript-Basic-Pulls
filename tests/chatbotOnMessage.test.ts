@@ -84,8 +84,8 @@ describe('ChatBot.onMessage - AI reply generation', () => {
 
     const response = await onMessage(event);
 
-    // Empty (ignored) response
-    expect(response.text).toBe('');
+    // Handler should indicate no response by returning null
+    expect(response).toBeNull();
 
     // LLM endpoint should NOT have been reached
     expect(openaiScope.isDone()).toBe(false);
