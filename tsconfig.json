@@ -1,0 +1,17 @@
+
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "strict": true,
+    "noImplicitAny": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["google-apps-script", "node", "jest"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["tests/**/*", "tests/helpers/**/*"]
+}

@@ -2,7 +2,7 @@
 // included in devDependencies via Jest's `tsconfig`. No manual declaration
 // override is needed here.
 
-import * as nock from 'nock';
+import nock from 'nock';
 
 import { getThreadMessages } from '../src/services/GoogleChatService';
 

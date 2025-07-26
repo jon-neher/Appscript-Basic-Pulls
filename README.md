@@ -1,5 +1,7 @@
 # AppScript Chat Knowledge Bot
 
+[![Branch coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)](https://github.com/jon-neher/Appscript-Basic-Pulls/actions/workflows/ci.yml)
+
 This repository contains the source code and configuration for a Google Apps Script powered Google Chat bot that helps teams surface and manage knowledge right inside Chat.
 
 The project uses the [Google clasp CLI](https://github.com/google/clasp) for local development and deployment.

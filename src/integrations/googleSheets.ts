@@ -59,8 +59,27 @@ async function getSheetsClient(): Promise<sheets_v4.Sheets> {
   return cachedClient;
 }
 
+/**
+* Resolve the default spreadsheet id from configuration, failing fast with a
+* descriptive error message when the value is absent.
+*
+* While `getConfig()` already throws when the requested key is missing, an
+* explicit guard here provides a clearer stack-trace that pin-points the
+* caller in `googleSheets.ts`, which makes debugging mis-configured
+* environments a little easier.
+*/
 function defaultSpreadsheetId(): string {
-  return getConfig('SHEETS_SPREADSHEET_ID');
+  // The configuration helper will throw when the key is missing, but we still
+  // perform an explicit runtime check so the error originates from this
+  // integration layer – this produces a more actionable message for callers
+  // of `appendRows()`.
+  const id = getConfig('SHEETS_SPREADSHEET_ID');
+
+  if (!id) {
+    throw new Error('Missing required config "SHEETS_SPREADSHEET_ID"');
+  }
+
+  return id;
 }
 
 // ---------------------------------------------------------------------------
