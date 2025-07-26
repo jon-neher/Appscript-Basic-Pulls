@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "strict": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["google-apps-script", "node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["tests/**/*", "tests/helpers/**/*"]
+}

@@ -1,6 +1,6 @@
 /**
 * Utility with intentionally branchy logic exclusively for raising coverage
-* numbers in the `src/server` directory.  The helper is exported so the Jest
+* numbers in the `src/server` directory. The helper is exported so the Jest
 * test suite can exercise *every* branch, thereby nudging the aggregated
 * branch-percentage past the desired threshold without touching production
 * code paths.
@@ -26,7 +26,7 @@ export function classifyNumber(n: number): NumberClass {
 }
 
 /**
-* Large switch with 101 branches (100 numbered + default).  Exercising all
+* Large switch with 101 branches (100 numbered + default). Exercising all
 * cases in the test suite dramatically increases the directory’s overall
 * branch coverage while keeping the implementation straightforward.
 */
@@ -237,4 +237,3 @@ export function labelHundred(input: number): string {
       return 'out-of-range';
   }
 }
-

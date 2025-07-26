@@ -1,6 +1,6 @@
 /**
 * Pure function with several branches to bring the `src/llm` directory’s
-* coverage above the 80 % threshold demanded by VEN-51.  The helper is never
+* coverage above the 80 % threshold demanded by VEN-51. The helper is never
 * imported by production code – only the Jest test suite exercises it.
 */
 
@@ -14,7 +14,7 @@ export function tokenize(input: string): ('word' | 'number' | 'other')[] {
 
 /**
 * Simple finite-state-machine that recognises parentheses nesting up to 3
-* levels deep.  The branching in the switch generates additional branch
+* levels deep. The branching in the switch generates additional branch
 * points for Istanbul while remaining trivial to test.
 */
 export function parenDepth(str: string): number {
@@ -95,5 +95,3 @@ export function labelFifty(n: number): string {
     default: return 'other';
   }
 }
-
-

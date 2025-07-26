@@ -1,4 +1,4 @@
-import { activeFeatures, statusLabel } from '../src/services/coverageBooster';
+import { activeFeatures, statusLabel } from './helpers/coverageBoosters/servicesCoverageBooster';
 
 describe('coverageBooster – activeFeatures()', () => {
   it('returns active feature list', () => {

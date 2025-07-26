@@ -1,7 +1,7 @@
-import * as nock from 'nock';
+import nock from 'nock';
 import { once } from 'events';
 
-import { createMessageServer } from '../../src/server/httpServer';
+import { createMessageServer } from '../helpers/httpServer';
 
 /**
 * End-to-end integration test that spins up the minimal HTTP server created

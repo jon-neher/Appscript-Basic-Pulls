@@ -1,4 +1,4 @@
-import * as nock from 'nock';
+import nock from 'nock';
 
 // Must import after nock is configured for proper interception order.
 import { generateText } from '../src/llm/index';

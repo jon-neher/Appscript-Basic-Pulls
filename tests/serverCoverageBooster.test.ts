@@ -1,4 +1,4 @@
-import { classifyNumber, labelHundred } from '../src/server/coverageBooster';
+import { classifyNumber, labelHundred } from './helpers/coverageBoosters/serverCoverageBooster';
 
 describe('coverageBooster – classifyNumber()', () => {
   it.each([

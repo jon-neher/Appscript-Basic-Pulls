@@ -1,4 +1,4 @@
-import { tokenize, parenDepth, labelFifty } from '../src/llm/coverageBooster';
+import { tokenize, parenDepth, labelFifty } from './helpers/coverageBoosters/llmCoverageBooster';
 
 describe('coverageBooster – tokenize()', () => {
   it('classifies tokens correctly', () => {

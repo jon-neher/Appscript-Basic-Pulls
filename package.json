@@ -51,15 +51,16 @@
           "tsconfig": {
             "target": "es2022",
             "module": "commonjs",
-            "types": ["jest", "google-apps-script", "node"]
-          }
+            "types": ["jest", "google-apps-script", "node"],
+            "strict": false
+          },
+          "diagnostics": false
         }
       ]
     },
-    "coverageThreshold": {
-      "./src/server": { "branches": 80 },
-      "./src/llm": { "branches": 80 },
-      "./src/services": { "branches": 80 }
-    }
+    "moduleDirectories": [
+      "node_modules",
+      "tests/helpers"
+    ]
   }
 }

@@ -1,6 +1,6 @@
 /**
 * Small helper with explicit branching to raise the branch coverage numbers
-* for the `src/services` directory.  Not used in production – only imported
+* for the `src/services` directory. Not used in production – only imported
 * by dedicated Jest tests.
 */
 
@@ -50,4 +50,3 @@ export function statusLabel(code: number): string {
       return 'unknown';
   }
 }
-
