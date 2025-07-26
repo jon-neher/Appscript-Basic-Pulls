@@ -19,6 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { getConfig } from '../config/index';
+import { error as logError } from '../utils/logger';
 
 // NOTE: We previously disabled `@typescript-eslint/no-explicit-any` for the entire
 // file.  That blanket disable hid potentially unsafe `any` usages and could allow
@@ -232,7 +233,7 @@ export async function getThreadMessages(
       );
 
       if (status >= 400) {
-        console.error('Google Chat API error', {
+        logError('Google Chat API error', {
           status,
           payload: data,
         });
@@ -261,13 +262,13 @@ export async function getThreadMessages(
   } catch (err: any) {
     // Attempt to include status & payload if available
     if (err?.status) {
-      console.error('Google Chat API fetch error', {
+      logError('Google Chat API fetch error', {
         status: err.status,
         message: err?.message,
         payload: err?.data,
       });
     } else {
-      console.error('Google Chat API fetch error', err);
+      logError('Google Chat API fetch error', { err });
     }
 
     throw err; // re-throw so caller knows it failed

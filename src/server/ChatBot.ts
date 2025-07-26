@@ -19,6 +19,9 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+// Structured logger – ensures consistent JSON logs across all modules.
+import { error as logError } from '../utils/logger';
+
 // ---------------------------------------------------------------------------
 // Runtime detection helpers
 // ---------------------------------------------------------------------------
@@ -97,7 +100,7 @@ function ensureSheetsIntegration(): Promise<void> {
       .catch((err) => {
         // Surface the error to all awaiters but keep a rejected promise cached
         // so that future calls don’t repeatedly attempt to import.
-        console.error('Failed to load googleSheets integration', err);
+        logError('Failed to load googleSheets integration', { err });
         throw err;
       });
   }
@@ -225,7 +228,7 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | nu
 
     return createResponse({ text: aiReply });
   } catch (err) {
-    console.error('onMessage AI reply error', err);
+    logError('onMessage AI reply error', { err });
     return createResponse({ text: 'Sorry - I encountered an error while replying.' });
   }
 }
@@ -321,10 +324,10 @@ async function onSlashCommand(event: ChatEvent): Promise<Record<string, unknown>
               // Fire-and-forget to keep Chat latency low; errors are logged but
               // do NOT bubble up to the slash-command response.
               void appendRows([knowledgeRow]).catch((err) =>
-                console.error('Sheets append error', err)
+                logError('Sheets append error', { err })
               );
             } catch (sheetErr) {
-              console.error('googleSheets integration error', sheetErr);
+              logError('googleSheets integration error', { err: sheetErr });
             }
           }
         }
@@ -333,7 +336,7 @@ async function onSlashCommand(event: ChatEvent): Promise<Record<string, unknown>
           text: `Got it – captured context for thread ${threadId} in space ${spaceId}.`,
         });
       } catch (err: any) {
-        console.error('/capture-knowledge error', err); // Log for Stackdriver.
+        logError('/capture-knowledge error', { err }); // Structured log
         return createResponse({
           text:
             'Sorry – I couldn’t capture the conversation context. ' +
@@ -388,7 +391,7 @@ async function doPost(
       JSON.stringify(response ?? { text: 'Unsupported event.' })
     ).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
-    console.error('doPost error', err);
+    logError('doPost error', { err });
     return ContentService.createTextOutput(
       JSON.stringify({ text: 'Internal error handling event.' })
     ).setMimeType(ContentService.MimeType.JSON);
