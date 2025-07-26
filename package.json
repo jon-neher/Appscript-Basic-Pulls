@@ -61,6 +61,11 @@
     "moduleDirectories": [
       "node_modules",
       "tests/helpers"
-    ]
+    ],
+    "coverageThreshold": {
+      "./src/server": { "branches": 50 },
+      "./src/llm": { "branches": 60 },
+      "./src/services": { "branches": 70 }
+    }
   }
 }
