@@ -16,9 +16,24 @@ The bot runs inside Apps Script, but **CI / local development** use a **GCP serv
 ### 0.1  Create the service account (one-time)
 
 ```bash
-# Variables – adjust the project ID and service-account name to your environment
-export GCP_PROJECT_ID="knowledge-assistant-prod"          # <-- your project ID
-export SA_NAME="knowledge-assistant-bot"                 # <-- keep it lowercase
+# Variables – replace the placeholders with **your** values
+# (feel free to keep the same names if they suit your project)
+#
+# ┌──────────────────┐           ┌────────────────────┐
+# │  <GCP_PROJECT_ID>│  ◀──────  │  your Cloud project│
+# └──────────────────┘           └────────────────────┘
+#             ▲
+#             │
+# ┌──────────────────┐           ┌────────────────────┐
+# │     <SA_NAME>    │  ◀──────  │service-account name│
+# └──────────────────┘           └────────────────────┘
+
+# Example that matches the rest of this guide:
+#   GCP_PROJECT_ID="knowledge-assistant-prod"
+#   SA_NAME="knowledge-assistant-bot"
+
+export GCP_PROJECT_ID="<GCP_PROJECT_ID>"          # e.g. knowledge-assistant-prod
+export SA_NAME="<SA_NAME>"                        # e.g. knowledge-assistant-bot (lowercase)
 
 # Create the account (safe to re-run if it already exists)
 gcloud iam service-accounts create "$SA_NAME" \
@@ -66,9 +81,10 @@ gcloud iam service-accounts keys create "sa-key.json" \
 | Setting | Example value |
 |---------|---------------|
 | **Project ID** | `knowledge-assistant-prod` |
-| **Service-account email** | `knowledge-assistant-bot@knowledge-assistant-prod.iam.gserviceaccount.com` |
+| **Service-account email** | `<SA_NAME>@<GCP_PROJECT_ID>.iam.gserviceaccount.com` (e.g. `knowledge-assistant-bot@knowledge-assistant-prod.iam.gserviceaccount.com`) |
 
-Keep these handy – they are referenced throughout the rest of this guide.
+Keep these handy – they are referenced throughout the rest of this guide.  
+**Important:** entries surrounded by angle brackets (`<…>`) are **placeholders**. Substitute them with your own project ID and service-account name before running the commands.
 
 ---
 
