@@ -1,11 +1,92 @@
 # Deployment Guide
 
-This document describes **two** ways to ship the _AppScript-Chat-Knowledge_ bot to Google Apps Script so that it can be used as a Google Chat app:
+This document describes **two** ways to ship the _AppScript-Chat-Knowledge_ bot to Google Apps Script so that it can be used as a Google Chat app **_and_** write captured knowledge into Google Sheets.
 
 1. **Manual MVP deployment** – copy-and-paste friendly commands that work on any machine.
 2. **Semi-automated deployment script** (`scripts/deploy.sh`) – a thin wrapper around the same commands with a few safety checks.
 
 > The manual path is the **source of truth**. The bash script is optional and mirrors the exact steps below.
+
+---
+
+## 0  Service-account setup (Chat + Sheets)
+
+The bot runs inside Apps Script, but **CI / local development** use a **GCP service account** to push code with `clasp` **and** to call the Google Sheets API with Application Default Credentials (ADC).
+
+### 0.1  Create the service account (one-time)
+
+```bash
+# Variables – replace the placeholders with **your** values
+# (feel free to keep the same names if they suit your project)
+#
+# ┌──────────────────┐           ┌────────────────────┐
+# │  <GCP_PROJECT_ID>│  ◀──────  │  your Cloud project│
+# └──────────────────┘           └────────────────────┘
+#             ▲
+#             │
+# ┌──────────────────┐           ┌────────────────────┐
+# │     <SA_NAME>    │  ◀──────  │service-account name│
+# └──────────────────┘           └────────────────────┘
+
+# Example that matches the rest of this guide:
+#   GCP_PROJECT_ID="knowledge-assistant-prod"
+#   SA_NAME="knowledge-assistant-bot"
+
+export GCP_PROJECT_ID="<GCP_PROJECT_ID>"          # e.g. knowledge-assistant-prod
+export SA_NAME="<SA_NAME>"                        # e.g. knowledge-assistant-bot (lowercase)
+
+# Create the account (safe to re-run if it already exists)
+gcloud iam service-accounts create "$SA_NAME" \
+  --project "$GCP_PROJECT_ID" \
+  --description "Apps Script Chat + Sheets bot" \
+  --display-name "Knowledge Assistant Bot"
+
+# Capture the email for later steps (service-account emails are of the form name@project.iam.gserviceaccount.com)
+export SA_EMAIL="${SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
+```
+
+### 0.2  Grant minimum roles
+
+The service account only needs **two** roles:
+
+- `roles/script.serviceAgent` – allows `clasp` to push Apps Script code.
+- `roles/iam.serviceAccountTokenCreator` – allows Cloud Build / GitHub Actions to impersonate the account.
+
+```bash
+gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" \
+  --member "serviceAccount:${SA_EMAIL}" \
+  --role "roles/script.serviceAgent"
+
+gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" \
+  --member "serviceAccount:${SA_EMAIL}" \
+  --role "roles/iam.serviceAccountTokenCreator"
+```
+
+> **Why not editor/owner?** Least-privilege: the bot only pushes Apps Script and edits a specific spreadsheet – no broad project-wide permissions are required.
+
+### 0.3  Download a key for CI (optional)
+
+For local development interactive `clasp login` is easier, but CI needs a key file:
+
+```bash
+gcloud iam service-accounts keys create "sa-key.json" \
+  --iam-account "$SA_EMAIL" \
+  --project "$GCP_PROJECT_ID"
+
+# Upload `sa-key.json` as `GOOGLE_APPLICATION_CREDENTIALS` secret in GitHub Actions.
+```
+
+### 0.4  Documented identifiers
+
+| Setting | Example value |
+|---------|---------------|
+| **Project ID** | `knowledge-assistant-prod` |
+| **Service-account email** | `<SA_NAME>@<GCP_PROJECT_ID>.iam.gserviceaccount.com` (e.g. `knowledge-assistant-bot@knowledge-assistant-prod.iam.gserviceaccount.com`) |
+
+Keep these handy – they are referenced throughout the rest of this guide.  
+**Important:** entries surrounded by angle brackets (`<…>`) are **placeholders**. Substitute them with your own project ID and service-account name before running the commands.
+
+---
 
 ---
 
@@ -15,6 +96,7 @@ This document describes **two** ways to ship the _AppScript-Chat-Knowledge_ bot 
 - **Node.js ≥ 18** (tested with v22) and **npm ≥ 9**.
 - **clasp CLI ≥ 3.0** – either globally (`npm i -g @google/clasp`) or the project-local binary (`npx clasp`).
 - **Git** – only required if you want to clone the repository.
+- **GCP service account** with Chat + Sheets OAuth scopes (see **0. Service-account setup** below).
 - **GCP service account key** (JSON) _or_ regular OAuth login for clasp.
 - **OpenAI / Gemini API keys** if the bot calls external LLMs (configured inside `src/config`).
 
@@ -54,6 +136,23 @@ npm run login           # equivalent to: npx clasp login --no-localhost
 ```bash
 npm run build           # esbuild bundles TypeScript -> dist/bundle.gs
 ```
+
+**Manifest scopes** – double-check that `appsscript.json` in the repo lists exactly **three** scopes:
+
+```jsonc
+{
+  "oauthScopes": [
+    // Required for Chat messages & slash commands
+    "https://www.googleapis.com/auth/chat.bot",
+    // Required for Sheets writes performed by the capture-knowledge pipeline
+    "https://www.googleapis.com/auth/spreadsheets",
+    // Required for outbound HTTPS calls to the LLM provider
+    "https://www.googleapis.com/auth/script.external_request"
+  ]
+}
+```
+
+If you add scopes later remember to **push** again and **re-authorize** the script when prompted.
 
 The build step executes two node scripts:
 
@@ -126,7 +225,22 @@ The easiest path during MVP is to **turn on Google Chat API in test mode**:
 
 ---
 
-## 5  Troubleshooting
+## 5  Granting Google Sheets access
+
+The capture-knowledge pipeline appends rows to a spreadsheet whose ID is set in the `SHEETS_SPREADSHEET_ID` config variable. Because the Apps Script executes **as the service account** when triggered from CI (and as *your* identity when running locally) the sheet **must** be shared with that account.
+
+1. Open the Google Sheet.
+2. Click **Share → Share with people and groups**.
+3. Paste the **service-account email** (see step 0.4) and choose **Editor**.
+4. Click **Send**.
+
+No domain-wide delegation or Drive-level role bindings are required – a per-file share is sufficient.
+
+> **Tip**: If you maintain separate spreadsheets for staging vs. prod just repeat the same four clicks on each file.
+
+---
+
+## 6  Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|------|
@@ -138,7 +252,7 @@ The easiest path during MVP is to **turn on Google Chat API in test mode**:
 
 ---
 
-## 6  CI / CD notes (optional)
+## 7  CI / CD notes (optional)
 
 `clasp` supports non-interactive service-account auth:
 
@@ -153,7 +267,7 @@ You can plug the three commands above into GitHub Actions after adding the servi
 
 ---
 
-## 7  Quick reference commands
+## 8  Quick reference commands
 
 ```bash
 # One-liner alias for local iteration
@@ -169,12 +283,14 @@ clasp deployments   # list web-app deployments
 
 ## Appendix A – Required OAuth scopes
 
-The manifest already includes the only scope needed for a Google Chat bot:
+The manifest lists **three** scopes – each required for a specific feature:
 
 ```json
 "oauthScopes": [
-  "https://www.googleapis.com/auth/chat.bot"
+  "https://www.googleapis.com/auth/chat.bot",            // Chat messages & commands
+  "https://www.googleapis.com/auth/spreadsheets",         // Append knowledge rows
+  "https://www.googleapis.com/auth/script.external_request" // Outbound HTTPS calls (LLM)
 ]
 ```
 
-No additional scopes are required unless you extend the bot to call other Google APIs.
+Only add further scopes if you call additional Google APIs. Keep the list minimal to honor the _least-privilege_ principle.
