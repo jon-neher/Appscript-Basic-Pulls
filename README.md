@@ -111,6 +111,55 @@ After that you can iterate with the usual `push` / `pull` / `open` commands as d
 - `src/` – All Apps Script `.gs` (and plain `.js`) files plus the `appsscript.json` manifest.
 - `docs/` – Additional project documentation.
 
+## Usage – interacting with the bot in Google Chat
+
+### 1  Ask the bot for help
+
+Mention the bot directly in any Chat space or DM and append the keyword `help`:
+
+```text
+@Knowledge Bot help
+```
+
+The bot responds with a short capability overview so that first-time users know what is available:
+
+```text
+Need a hand? Here’s what I can do:
+- Summarise a long thread and draft a concise reply when @-mentioned inside the thread.
+- `/capture-knowledge` — archive the current conversation context in the team knowledge spreadsheet.
+- `/ping` — quick connectivity check (returns "pong").
+```
+
+> **Tip**: If you address the bot outside a thread it currently echoes back your
+> text (e.g. `You said: "help"`). Inside a thread it fetches the last
+> messages, builds a prompt, and lets the LLM generate a contextual answer.
+
+### 2  Capture conversation context (`/capture-knowledge`)
+
+Run the slash-command inside **a threaded conversation** to save the entire
+thread into the configured Google Sheets knowledge base:
+
+```text
+/capture-knowledge
+```
+
+Successful response:
+
+```text
+Got it – captured context for thread <threadId> in space <spaceId>.
+```
+
+Behind the scenes the bot:
+
+- Calls the Google Chat REST API to fetch every message in the thread (handles
+  pagination beyond 100 messages).
+- Converts the raw messages into Markdown and stores a single row in the sheet
+  whose ID is provided via `SHEETS_SPREADSHEET_ID`.
+
+If you run the command outside a thread the bot replies with a helpful error
+message explaining that the command must be executed inside a threaded
+conversation.
+
 ## Manifest highlights (`src/appsscript.json`)
 
 - Uses the modern **V8** runtime.
@@ -189,25 +238,37 @@ The helper transparently looks up the key in:
 
 and throws a descriptive error when a *required* value is missing.
 
-### Required keys
+### Required runtime keys
 
 | Key | Purpose | Notes |
 |-----|---------|-------|
 | `OPENAI_API_KEY` | Authentication for OpenAI LLM calls | **Required** when using the OpenAI provider |
 | `SHEETS_SPREADSHEET_ID` | Target spreadsheet id for captured knowledge | e.g. `1AbCdEf...` |
-| `GOOGLE_CHAT_ACCESS_TOKEN` | OAuth token for Google Chat API *when running tests locally* | Not required in Apps Script (ScriptApp token is used) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Absolute or relative path to a **service-account key JSON** that has **Editor** access to the spreadsheet | Used by Google Sheets integration when the bot runs in Node/CI |
 
-### Optional keys
+### Optional / advanced keys
 
 | Key | Purpose | Default |
 |-----|---------|---------|
 | `OPENAI_ENDPOINT` | Override the HTTPS endpoint for OpenAI | `https://api.openai.com/v1/chat/completions` |
-| `OPENAI_MODEL_ID` | Default model id | `gpt-4o-mini` |
-| `AI_BOT_USER_ID` | Resource name for the AI bot user | — |
+| `OPENAI_MODEL_ID` | Default model id for LLM calls | `gpt-4o-mini` |
+| `AI_BOT_USER_ID` | Resource name for the AI bot user (to correctly identify assistant vs. human messages) | — |
 | `AI_BOT_DISPLAY_NAME` | Display name fallback for the AI bot | — |
+| `GOOGLE_CHAT_ACCESS_TOKEN` | OAuth token for Google Chat API **only** when running integration tests outside Apps Script | Not required in production |
 
-> **Tip**: Any additional key accessed via `getConfig()` automatically inherits
-> the same lookup semantics—no code changes required.
+### GitHub Actions secrets (CI / CD)
+
+The default **CI / Test → Deploy** workflow expects **four** additional secrets – they are **only used by the GitHub runner**, not at runtime:
+
+| Secret | Why it’s needed |
+|--------|-----------------|
+| `CLASP_CLIENT_ID` | OAuth client id for the Apps Script API (see Google Cloud Console credentials page) |
+| `CLASP_CLIENT_SECRET` | OAuth client secret matching the above client id |
+| `CLASP_REFRESH_TOKEN` | Long-lived refresh token generated via `clasp login --no-localhost` |
+| `SCRIPT_ID` | The Script ID of the linked Apps Script project (found under **Project Settings → Script ID**) |
+
+> **Tip**: Any additional key accessed via `getConfig()` automatically
+> inherits the same lookup semantics—no code changes required.
 
 
 ## TypeScript & esbuild build pipeline (2025-07)
