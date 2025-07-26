@@ -52,7 +52,7 @@ describe('logger util', () => {
 
     const obj = getLoggedObject(warnSpy);
 
-    expect(obj.severity).toBe('WARN');
+    expect(obj.severity).toBe('WARNING');
     expect(obj.metadata).toEqual({ bar: 'baz' });
   });
 

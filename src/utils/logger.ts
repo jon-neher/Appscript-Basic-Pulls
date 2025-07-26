@@ -5,7 +5,7 @@
 *
 * Each exported method serialises a canonical object containing:
 *   – `timestamp` → ISO-8601 string in UTC (to millisecond precision).
-*   – `severity`  → one of DEBUG | INFO | WARN | ERROR (uppercase).
+*   – `severity`  → one of DEBUG | INFO | WARNING | ERROR (uppercase).
 *   – `message`   → human-readable message string.
 *   – `metadata`  → optional arbitrary JSON payload providing additional context.
 *
@@ -25,7 +25,7 @@
 // Types
 // ---------------------------------------------------------------------------
 
-export type LogSeverity = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+export type LogSeverity = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
 
 export interface LogMetadata {
   // Generic JSON payload – we deliberately do *not* attempt to constrain the
@@ -59,7 +59,7 @@ function emit(severity: LogSeverity, message: string, metadata?: LogMetadata): v
     case 'INFO':
       console.log(serialized);
       break;
-    case 'WARN':
+    case 'WARNING':
       console.warn(serialized);
       break;
     case 'ERROR':
@@ -75,7 +75,7 @@ function emit(severity: LogSeverity, message: string, metadata?: LogMetadata): v
 
 export const debug = (msg: string, meta?: LogMetadata): void => emit('DEBUG', msg, meta);
 export const info = (msg: string, meta?: LogMetadata): void => emit('INFO', msg, meta);
-export const warn = (msg: string, meta?: LogMetadata): void => emit('WARN', msg, meta);
+export const warn = (msg: string, meta?: LogMetadata): void => emit('WARNING', msg, meta);
 export const error = (msg: string, meta?: LogMetadata): void => emit('ERROR', msg, meta);
 
 export default { debug, info, warn, error } as const;
