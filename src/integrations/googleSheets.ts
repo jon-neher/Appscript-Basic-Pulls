@@ -60,7 +60,7 @@ async function getSheetsClient(): Promise<sheets_v4.Sheets> {
 }
 
 function defaultSpreadsheetId(): string {
-  return getConfig('SHEETS_SPREADSHEET_ID');
+  return getConfig('SHEETS_SPREADSHEET_ID')!;
 }
 
 // ---------------------------------------------------------------------------

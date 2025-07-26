@@ -75,7 +75,7 @@ function getAccessToken(): string {
   }
 
   // 2) Node / tests – expect the token via config layer (process.env passthrough)
-  return getConfig('GOOGLE_CHAT_ACCESS_TOKEN');
+  return getConfig('GOOGLE_CHAT_ACCESS_TOKEN')!;
 }
 
 /**

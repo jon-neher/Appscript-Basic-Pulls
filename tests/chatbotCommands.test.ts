@@ -29,7 +29,7 @@ describe('ChatBot additional command & edge-case coverage', () => {
       },
     } as any);
 
-    expect(res.text).toMatch(/encountered an error/i);
+    expect(res!.text).toMatch(/encountered an error/i);
   });
 
   it('responds to the built-in ping command', async () => {

@@ -63,7 +63,7 @@ describe('ChatBot.onMessage - AI reply generation', () => {
 
     const response = await onMessage(event);
 
-    expect(response.text).toBe('I am doing well, thanks!');
+    expect(response!.text).toBe('I am doing well, thanks!');
 
     openaiScope.done(); // ensure the LLM call happened
   });
