@@ -8,7 +8,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "types": ["google-apps-script", "node"]
+    "types": ["jest", "google-apps-script", "node"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["tests/**/*", "tests/helpers/**/*"]

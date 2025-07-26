@@ -45,18 +45,10 @@
       "ts"
     ],
     "transform": {
-      "^.+\\.ts$": [
-        "ts-jest",
-        {
-          "tsconfig": {
-            "target": "es2022",
-            "module": "commonjs",
-            "types": ["jest", "google-apps-script", "node"],
-            "strict": false
-          },
-          "diagnostics": false
-        }
-      ]
+      "^.+\\.ts$": "ts-jest"
+    },
+    "ts-jest": {
+      "tsconfig": "tsconfig.json"
     },
     "moduleDirectories": [
       "node_modules",
