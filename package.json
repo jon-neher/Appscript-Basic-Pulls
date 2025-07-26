@@ -9,7 +9,7 @@
     "push": "clasp push",
     "pull": "clasp pull",
     "open": "clasp open",
-    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand --coverage",
     "build": "node build/esbuild.config.js && node build/copyManifest.mjs",
     "watch": "node build/esbuild.config.js --watch",
     "deploy": "npm run build && clasp push --rootDir dist && clasp deploy --description \"Deploy from CI\"",
@@ -55,6 +55,11 @@
           }
         }
       ]
+    },
+    "coverageThreshold": {
+      "./src/server": { "branches": 80 },
+      "./src/llm": { "branches": 80 },
+      "./src/services": { "branches": 80 }
     }
   }
 }
