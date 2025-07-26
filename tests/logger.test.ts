@@ -66,4 +66,20 @@ describe('logger util', () => {
     expect(obj.message).toBe('oops');
     expect(obj.metadata).toEqual(meta);
   });
+
+  it('normalises Error instances in metadata to plain objects', () => {
+    const err = new Error('test error');
+
+    error('problem happened', { err });
+
+    const obj = getLoggedObject(errSpy);
+
+    expect(obj.metadata.err).toEqual(
+      expect.objectContaining({
+        name: err.name,
+        message: err.message,
+        stack: expect.any(String),
+      }),
+    );
+  });
 });

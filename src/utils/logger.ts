@@ -41,15 +41,55 @@ export interface LogEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Error / value normalisation helpers
+// ---------------------------------------------------------------------------
+
+/**
+* Recursively walk a value converting `Error` instances into plain objects with
+* enumerable `name`, `message`, and `stack` properties so they survive
+* `JSON.stringify()`.
+*
+* Arrays and plain objects are traversed depth-first; all other values are
+* returned as-is.
+*/
+function normalizeValue(value: unknown): unknown {
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      stack: value.stack,
+    };
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(normalizeValue);
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      result[k] = normalizeValue(v);
+    }
+    return result;
+  }
+
+  return value;
+}
+
+// ---------------------------------------------------------------------------
 // Internal helper – single implementation funneled through by the public API
 // ---------------------------------------------------------------------------
 
 function emit(severity: LogSeverity, message: string, metadata?: LogMetadata): void {
+  const normalizedMetadata = metadata
+    ? (normalizeValue(metadata) as LogMetadata)
+    : undefined;
+
   const entry: LogEntry = {
     timestamp: new Date().toISOString(),
     severity,
     message,
-    ...(metadata && Object.keys(metadata).length ? { metadata } : {}),
+    ...(normalizedMetadata && Object.keys(normalizedMetadata).length ? { metadata: normalizedMetadata } : {}),
   };
 
   const serialized = JSON.stringify(entry);
