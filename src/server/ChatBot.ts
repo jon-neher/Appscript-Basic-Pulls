@@ -145,6 +145,10 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | nu
     return createResponse({ text: `You said: "${userText}"` });
   }
 
+  // ---------------------------------------------------------------------------
+  // AI_PATH_DISABLED_FOR_MVP – Begin disabled AI reply flow
+  // ---------------------------------------------------------------------------
+  /*
   try {
     // Dynamically import heavy deps – memoised so the import executes only
     // once per module across the lifetime of the process.
@@ -231,6 +235,13 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | nu
     logError('onMessage AI reply error', { err });
     return createResponse({ text: 'Sorry - I encountered an error while replying.' });
   }
+  */
+  // ---------------------------------------------------------------------------
+  // AI_PATH_DISABLED_FOR_MVP – End disabled AI reply flow
+  // ---------------------------------------------------------------------------
+
+  // Temporary placeholder response while AI path is disabled.
+  return createResponse({ text: 'AI reply path disabled for MVP.' });
 }
 
 // ---------------------------------------------------------------------------
