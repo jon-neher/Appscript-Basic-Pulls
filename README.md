@@ -59,31 +59,6 @@ Once `.clasp.json` is in place the following convenience scripts are available:
 
 All scripts are thin wrappers around their equivalent `clasp <command>` counterparts to avoid memorizing flags.
 
-
-1. **Install dependencies**
-
-   ```bash
-   npm install
-   ```
-
-2. **Login to Google** (creates a local `.clasprc.json` *not* committed to Git):
-
-   ```bash
-   npm run login
-   ```
-
-3. **Push local code to the Apps Script project**
-
-   ```bash
-   npm run push
-   ```
-
-4. **Open the Apps Script editor in your browser**
-
-   ```bash
-   npm run open
-   ```
-
 ## Connecting to the shared script
 
 This repository is already wired up to the *team-shared* Google Apps Script project. The real `scriptId` lives in the root-level `.clasp.json` file and is version-controlled, so you don’t need to copy it around or set any environment variables.
@@ -121,18 +96,16 @@ Mention the bot directly in any Chat space or DM and append the keyword `help`:
 @Knowledge Bot help
 ```
 
-The bot responds with a short capability overview so that first-time users know what is available:
+The bot responds with a concise capability overview so that first-time users know what is available:
 
 ```text
 Need a hand? Here’s what I can do:
-- Summarise a long thread and draft a concise reply when @-mentioned inside the thread.
 - `/capture-knowledge` — archive the current conversation context in the team knowledge spreadsheet.
 - `/ping` — quick connectivity check (returns "pong").
 ```
 
-> **Tip**: If you address the bot outside a thread it currently echoes back your
-> text (e.g. `You said: "help"`). Inside a thread it fetches the last
-> messages, builds a prompt, and lets the LLM generate a contextual answer.
+> **Tip**: If you address the bot outside a thread it simply echoes back your
+> text (e.g. `You said: "help"`).
 
 ### 2  Capture conversation context (`/capture-knowledge`)
 
@@ -193,17 +166,6 @@ conversations.
 > `config/google-sheets-credentials.json` so you won’t accidentally commit the
 > secret. **Never** commit the raw key to a public repo.
 
-### Required environment variables
-
-Add the following variables to your `.env` (or export them in your CI/CD
-environment):
-
-```bash
-# .env.example
-GOOGLE_APPLICATION_CREDENTIALS="./config/google-sheets-credentials.json"
-SHEETS_SPREADSHEET_ID="1AbCdEfGhIjKlMnOpQrStUvWxYz1234567890"
-```
-
 ### Spreadsheet layout
 
 The first worksheet of the spreadsheet must have **A1:D1** set to the exact
@@ -228,7 +190,7 @@ All secrets and runtime options are now resolved via a **single** helper:
 ```ts
 import { getConfig } from './src/config';
 
-const apiKey = getConfig('OPENAI_API_KEY');
+const sheetId = getConfig('SHEETS_SPREADSHEET_ID');
 ```
 
 The helper transparently looks up the key in:
@@ -242,7 +204,6 @@ and throws a descriptive error when a *required* value is missing.
 
 | Key | Purpose | Notes |
 |-----|---------|-------|
-| `OPENAI_API_KEY` | Authentication for OpenAI LLM calls | **Required** when using the OpenAI provider |
 | `SHEETS_SPREADSHEET_ID` | Target spreadsheet id for captured knowledge | e.g. `1AbCdEf...` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Absolute or relative path to a **service-account key JSON** that has **Editor** access to the spreadsheet | Used by Google Sheets integration when the bot runs in Node/CI |
 
@@ -250,10 +211,6 @@ and throws a descriptive error when a *required* value is missing.
 
 | Key | Purpose | Default |
 |-----|---------|---------|
-| `OPENAI_ENDPOINT` | Override the HTTPS endpoint for OpenAI | `https://api.openai.com/v1/chat/completions` |
-| `OPENAI_MODEL_ID` | Default model id for LLM calls | `gpt-4o-mini` |
-| `AI_BOT_USER_ID` | Resource name for the AI bot user (to correctly identify assistant vs. human messages) | — |
-| `AI_BOT_DISPLAY_NAME` | Display name fallback for the AI bot | — |
 | `GOOGLE_CHAT_ACCESS_TOKEN` | OAuth token for Google Chat API **only** when running integration tests outside Apps Script | Not required in production |
 
 ### GitHub Actions secrets (CI / CD)
