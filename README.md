@@ -182,7 +182,6 @@ Feel free to adjust column widths, enable text wrapping, or add filters – the
 integration uses the `USER_ENTERED` valueInputOption so formatting is
 preserved.
 
-environment variables required.
 ## Configuration
 
 All secrets and runtime options are now resolved via a **single** helper:
