@@ -211,6 +211,7 @@ and throws a descriptive error when a *required* value is missing.
 | Key | Purpose | Default |
 |-----|---------|---------|
 | `GOOGLE_CHAT_ACCESS_TOKEN` | OAuth token for Google Chat API **only** when running integration tests outside Apps Script | Not required in production |
+| `ENABLE_AI` | When set to **`true`** the bot re-enables its AI-generated *assistant* replies for normal `MESSAGE` events. Leave unset or set to any other value to keep the MVP placeholder (`"AI reply path disabled for MVP."`). | Disabled |
 
 ### GitHub Actions secrets (CI / CD)
 
@@ -225,6 +226,23 @@ The default **CI / Test → Deploy** workflow expects **four** additional secret
 
 > **Tip**: Any additional key accessed via `getConfig()` automatically
 > inherits the same lookup semantics—no code changes required.
+
+
+### Enabling the AI reply flow (opt-in)
+
+The MVP ships with the AI-generated reply path **disabled by default**. To try
+it locally or in a staging deployment simply set the environment variable:
+
+```bash
+# in your shell or `.env` file
+export ENABLE_AI=true
+
+# then run the server / tests / `clasp push` as usual
+```
+
+When the flag is **not** `true` the bot responds to non-command messages with
+the placeholder text `AI reply path disabled for MVP.`. Slashes commands such
+as `/capture-knowledge` are unaffected.
 
 
 ## TypeScript & esbuild build pipeline (2025-07)
