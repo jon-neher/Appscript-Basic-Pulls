@@ -26,9 +26,8 @@ describe('POST /message → placeholder response (AI path disabled)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     nock.enableNetConnect((host: any) => host.startsWith('127.0.0.1'));
 
-    // Required runtime config for Google Chat + OpenAI helpers.
+    // Required runtime config for Google Chat.
     process.env.GOOGLE_CHAT_ACCESS_TOKEN = 'dummy-chat-token';
-    process.env.OPENAI_API_KEY = 'dummy-openai-key';
 
     server = createMessageServer().listen(0);
     await once(server, 'listening');
@@ -51,7 +50,7 @@ describe('POST /message → placeholder response (AI path disabled)', () => {
 
   it('returns the placeholder reply when AI path is disabled', async () => {
     // ---------------- Google Chat thread fetch (should NOT be called) -------
-    nock(chatBase)
+    const chatScope = nock(chatBase)
       .get(threadPath)
       .query(true)
       .reply(200, {});
@@ -79,7 +78,8 @@ describe('POST /message → placeholder response (AI path disabled)', () => {
     const json = (await res.json()) as { text: string };
     expect(json.text).toMatch(/AI reply path disabled/i);
 
-    // LLM endpoint should NOT have been reached
+    // Neither LLM nor Google Chat endpoints should have been reached
     expect(openaiScope.isDone()).toBe(false);
+    expect(chatScope.isDone()).toBe(false);
   });
 });

@@ -12,9 +12,8 @@ describe('ChatBot.onMessage - AI reply generation (disabled for MVP)', () => {
   const threadPath = '/v1/spaces/AAA/threads/BBB/messages';
 
   beforeAll(() => {
-    // Required for GoogleChatService auth and LLM provider.
+    // Required for GoogleChatService auth.
     process.env.GOOGLE_CHAT_ACCESS_TOKEN = 'dummy-chat-token';
-    process.env.OPENAI_API_KEY = 'dummy-openai-key';
   });
 
   afterEach(() => {
@@ -27,7 +26,7 @@ describe('ChatBot.onMessage - AI reply generation (disabled for MVP)', () => {
     // the test will fail if a request slips through.
 
     // Stub: Google Chat GET – expect **zero** calls.
-    nock(chatBase)
+    const chatScope = nock(chatBase)
       .get(threadPath)
       .query(true)
       .reply(200, {});
@@ -53,8 +52,9 @@ describe('ChatBot.onMessage - AI reply generation (disabled for MVP)', () => {
 
     expect(response!.text).toMatch(/AI reply path disabled/i);
 
-    // LLM endpoint should **not** have been reached
+    // Neither LLM nor Google Chat endpoints should have been reached
     expect(openaiScope.isDone()).toBe(false);
+    expect(chatScope.isDone()).toBe(false);
   });
 
   it('ignores slash-command events', async () => {
