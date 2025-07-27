@@ -137,6 +137,64 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | nu
     return null;
   }
 
+  // -------------------------------------------------------------------
+  // MVP behaviour – LLM path disabled
+  // -------------------------------------------------------------------
+
+  // For the initial MVP we bypass the expensive LLM reply flow entirely and
+  // simply echo the user’s text. This applies to both threaded and
+  // top-level messages.
+
+  const userText = event?.message?.text ?? '';
+  return createResponse({ text: `You said: "${userText}"` });
+
+  /*
+   * ###############################################################
+   * # Legacy AI reply flow (disabled for MVP – retained for later) #
+   * ###############################################################
+   *
+   * The implementation that follows fetched the surrounding thread
+   * messages, built a context window, assembled an LLM prompt, and
+   * called `generateText()` to obtain an AI-crafted answer. The entire
+   * block is now commented out to ensure TypeScript no longer type-
+   * checks the unreachable code path, avoiding unnecessary imports and
+   * compilation errors while we ship the simpler echo behaviour.
+   */
+
+  /*
+   const threadName: string | undefined = event?.message?.thread?.name;
+
+   if (!threadName) {
+     const userText = event?.message?.text ?? '';
+     return createResponse({ text: `You said: "${userText}"` });
+   }
+
+   try {
+     if (!chatServiceModule) {
+       chatServiceModule = await import('../services/GoogleChatService');
+     }
+     if (!llmModule) {
+       llmModule = await import('../llm/index');
+     }
+
+     const { getThreadMessages } = chatServiceModule;
+     const { generateText } = llmModule;
+
+     const { buildContextWindow } = await import('../llm/contextWindow');
+
+     const fullThread = await getThreadMessages(threadName);
+     // … (token budgeting & prompt construction) …
+     const prompt = '...';
+     const aiReply = await generateText(prompt);
+
+     return createResponse({ text: aiReply });
+   } catch (err) {
+     logError('onMessage AI reply error', { err });
+     return createResponse({ text: 'Sorry - I encountered an error while replying.' });
+   }
+  */
+
+  /*
   const threadName: string | undefined = event?.message?.thread?.name;
 
   // If we somehow receive a non-threaded message, fallback to simple echo.
@@ -231,6 +289,7 @@ async function onMessage(event: ChatEvent): Promise<Record<string, unknown> | nu
     logError('onMessage AI reply error', { err });
     return createResponse({ text: 'Sorry - I encountered an error while replying.' });
   }
+*/
 }
 
 // ---------------------------------------------------------------------------

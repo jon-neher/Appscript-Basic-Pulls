@@ -10,27 +10,9 @@ describe('ChatBot additional command & edge-case coverage', () => {
     expect(response).toEqual({ text: 'You said: "Just saying hi!"' });
   });
 
-  it('falls back to error message when LLM provider fails', async () => {
-    jest.resetModules(); // ensure fresh import & mock isolation
 
-    // Dynamically mock the LLM module **before** re-importing ChatBot so the
-    // internal `import()` picks up our stub.
-    jest.doMock('../src/llm/index', () => ({
-      generateText: jest.fn().mockRejectedValue(new Error('LLM outage')),
-    }));
-
-    const { onMessage: mockedOnMessage } = await import('../src/server/ChatBot');
-
-    const res = await mockedOnMessage({
-      type: 'MESSAGE',
-      message: {
-        text: 'Hi',
-        thread: { name: 'spaces/AAA/threads/BBB' },
-      },
-    } as any);
-
-    expect(res!.text).toMatch(/encountered an error/i);
-  });
+  // AI reply path is disabled, so LLM failure scenarios are no longer
+  // applicable for the current MVP. The dedicated test has been removed.
 
   it('responds to the built-in ping command', async () => {
     const res = await onSlashCommand({

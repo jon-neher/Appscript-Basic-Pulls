@@ -13,9 +13,9 @@ import { createMessageServer } from '../helpers/httpServer';
 * and finally returns the assistant reply as JSON.
 */
 
-describe('POST /message → LLM → response (E2E)', () => {
-  const chatBase = 'https://chat.googleapis.com';
-  const threadPath = '/v1/spaces/AAA/threads/BBB/messages';
+describe('POST /message → echo response (E2E)', () => {
+  // No external HTTP calls are expected in the echo-only MVP, but we still
+  // keep network mocking disabled to guard against accidental outbound calls.
 
   let server: ReturnType<typeof createMessageServer>;
   let port: number;
@@ -25,10 +25,6 @@ describe('POST /message → LLM → response (E2E)', () => {
     nock.disableNetConnect();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     nock.enableNetConnect((host: any) => host.startsWith('127.0.0.1'));
-
-    // Required runtime config for Google Chat + OpenAI helpers.
-    process.env.GOOGLE_CHAT_ACCESS_TOKEN = 'dummy-chat-token';
-    process.env.OPENAI_API_KEY = 'dummy-openai-key';
 
     server = createMessageServer().listen(0);
     await once(server, 'listening');
@@ -49,32 +45,8 @@ describe('POST /message → LLM → response (E2E)', () => {
     nock.cleanAll();
   });
 
-  it('returns the assistant reply for a standard message', async () => {
-    // ---------------- Google Chat thread fetch --------------------
-    nock(chatBase)
-      .get(threadPath)
-      .query(true)
-      .reply(200, {
-        messages: [
-          {
-            name: 'spaces/AAA/threads/BBB/messages/1',
-            text: 'Hello?',
-            createTime: '2025-07-25T10:00:00Z',
-            sender: { name: 'users/USER1', displayName: 'Alice' },
-          },
-        ],
-      });
-
-    // ---------------- OpenAI completions --------------------------
-    const openaiScope = nock('https://api.openai.com')
-      .post('/v1/chat/completions')
-      .reply(200, {
-        choices: [
-          {
-            message: { role: 'assistant', content: 'Hey Alice! 👋' },
-          },
-        ],
-      });
+  it('returns an echoed reply for a standard message', async () => {
+    // No external calls expected – the MVP simply echoes the message text.
 
     // ---------------- HTTP call under test ------------------------
     const res = await fetch(`http://127.0.0.1:${port}/message`, {
@@ -92,8 +64,6 @@ describe('POST /message → LLM → response (E2E)', () => {
 
     expect(res.status).toBe(200);
     const json = (await res.json()) as { text: string };
-    expect(json.text).toBe('Hey Alice! 👋');
-
-    openaiScope.done(); // ensure LLM call happened
+    expect(json.text).toBe('You said: "Hello?"');
   });
 });

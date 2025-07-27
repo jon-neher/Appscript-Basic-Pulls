@@ -125,14 +125,12 @@ The bot responds with a short capability overview so that first-time users know 
 
 ```text
 Need a hand? Here’s what I can do:
-- Summarise a long thread and draft a concise reply when @-mentioned inside the thread.
 - `/capture-knowledge` — archive the current conversation context in the team knowledge spreadsheet.
 - `/ping` — quick connectivity check (returns "pong").
 ```
 
-> **Tip**: If you address the bot outside a thread it currently echoes back your
-> text (e.g. `You said: "help"`). Inside a thread it fetches the last
-> messages, builds a prompt, and lets the LLM generate a contextual answer.
+> **Tip**: If you address the bot outside a thread it simply echoes back your
+> text (e.g. `You said: "help"`).
 
 ### 2  Capture conversation context (`/capture-knowledge`)
 
@@ -242,7 +240,6 @@ and throws a descriptive error when a *required* value is missing.
 
 | Key | Purpose | Notes |
 |-----|---------|-------|
-| `OPENAI_API_KEY` | Authentication for OpenAI LLM calls | **Required** when using the OpenAI provider |
 | `SHEETS_SPREADSHEET_ID` | Target spreadsheet id for captured knowledge | e.g. `1AbCdEf...` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Absolute or relative path to a **service-account key JSON** that has **Editor** access to the spreadsheet | Used by Google Sheets integration when the bot runs in Node/CI |
 
@@ -251,6 +248,7 @@ and throws a descriptive error when a *required* value is missing.
 | Key | Purpose | Default |
 |-----|---------|---------|
 | `OPENAI_ENDPOINT` | Override the HTTPS endpoint for OpenAI | `https://api.openai.com/v1/chat/completions` |
+| `OPENAI_API_KEY` | Authentication for OpenAI LLM calls (only needed if you later re-enable AI replies) | — |
 | `OPENAI_MODEL_ID` | Default model id for LLM calls | `gpt-4o-mini` |
 | `AI_BOT_USER_ID` | Resource name for the AI bot user (to correctly identify assistant vs. human messages) | — |
 | `AI_BOT_DISPLAY_NAME` | Display name fallback for the AI bot | — |
