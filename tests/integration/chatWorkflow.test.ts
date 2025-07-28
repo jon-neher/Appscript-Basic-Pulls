@@ -13,7 +13,7 @@ import { createMessageServer } from '../helpers/httpServer';
 * and finally returns the assistant reply as JSON.
 */
 
-describe('POST /message → LLM → response (E2E)', () => {
+describe('POST /message → placeholder response (AI path disabled)', () => {
   const chatBase = 'https://chat.googleapis.com';
   const threadPath = '/v1/spaces/AAA/threads/BBB/messages';
 
@@ -26,9 +26,8 @@ describe('POST /message → LLM → response (E2E)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     nock.enableNetConnect((host: any) => host.startsWith('127.0.0.1'));
 
-    // Required runtime config for Google Chat + OpenAI helpers.
+    // Required runtime config for Google Chat.
     process.env.GOOGLE_CHAT_ACCESS_TOKEN = 'dummy-chat-token';
-    process.env.OPENAI_API_KEY = 'dummy-openai-key';
 
     server = createMessageServer().listen(0);
     await once(server, 'listening');
@@ -49,32 +48,17 @@ describe('POST /message → LLM → response (E2E)', () => {
     nock.cleanAll();
   });
 
-  it('returns the assistant reply for a standard message', async () => {
-    // ---------------- Google Chat thread fetch --------------------
-    nock(chatBase)
+  it('returns the placeholder reply when AI path is disabled', async () => {
+    // ---------------- Google Chat thread fetch (should NOT be called) -------
+    const chatScope = nock(chatBase)
       .get(threadPath)
       .query(true)
-      .reply(200, {
-        messages: [
-          {
-            name: 'spaces/AAA/threads/BBB/messages/1',
-            text: 'Hello?',
-            createTime: '2025-07-25T10:00:00Z',
-            sender: { name: 'users/USER1', displayName: 'Alice' },
-          },
-        ],
-      });
+      .reply(200, {});
 
-    // ---------------- OpenAI completions --------------------------
+    // ---------------- OpenAI completions (should NOT be called) ------------
     const openaiScope = nock('https://api.openai.com')
       .post('/v1/chat/completions')
-      .reply(200, {
-        choices: [
-          {
-            message: { role: 'assistant', content: 'Hey Alice! 👋' },
-          },
-        ],
-      });
+      .reply(200, {});
 
     // ---------------- HTTP call under test ------------------------
     const res = await fetch(`http://127.0.0.1:${port}/message`, {
@@ -92,8 +76,10 @@ describe('POST /message → LLM → response (E2E)', () => {
 
     expect(res.status).toBe(200);
     const json = (await res.json()) as { text: string };
-    expect(json.text).toBe('Hey Alice! 👋');
+    expect(json.text).toMatch(/AI reply path disabled/i);
 
-    openaiScope.done(); // ensure LLM call happened
+    // Neither LLM nor Google Chat endpoints should have been reached
+    expect(openaiScope.isDone()).toBe(false);
+    expect(chatScope.isDone()).toBe(false);
   });
 });

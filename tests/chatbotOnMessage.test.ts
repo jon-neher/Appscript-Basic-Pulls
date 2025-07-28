@@ -1,53 +1,40 @@
 import nock from 'nock';
 
+// AI_PATH_DISABLED_FOR_MVP: The onMessage handler now returns a placeholder
+// response while the AI reply flow is disabled. Tests have been updated to
+// reflect the new behaviour and to ensure **no** external AI calls occur.
+
 import { onMessage } from '../src/server/ChatBot';
 
 
-describe('ChatBot.onMessage - AI reply generation', () => {
+describe('ChatBot.onMessage - AI reply generation (disabled for MVP)', () => {
   const chatBase = 'https://chat.googleapis.com';
   const threadPath = '/v1/spaces/AAA/threads/BBB/messages';
 
   beforeAll(() => {
-    // Required for GoogleChatService auth and LLM provider.
+    // Required for GoogleChatService auth.
     process.env.GOOGLE_CHAT_ACCESS_TOKEN = 'dummy-chat-token';
-    process.env.OPENAI_API_KEY = 'dummy-openai-key';
   });
 
   afterEach(() => {
     nock.cleanAll();
   });
 
-  it('generates an AI reply for a standard message', async () => {
-    // ---------------------------------------------------
-    // Stub: Google Chat GET – fetch thread messages
-    // ---------------------------------------------------
-    nock(chatBase)
-      .get(threadPath)
-      // Accept any query params – the handler may vary pageSize/orderBy.
-      .query(true)
-      .reply(200, {
-        messages: [
-          {
-            name: 'spaces/AAA/threads/BBB/messages/1',
-            text: 'Hello, how are you?',
-            createTime: '2025-07-25T10:00:00Z',
-            sender: { name: 'users/USER1', displayName: 'Alice' },
-          },
-        ],
-      });
+  it('returns a placeholder when AI path is disabled', async () => {
+    // AI_PATH_DISABLED_FOR_MVP: The handler should *not* fetch Chat history or
+    // call the OpenAI completions endpoint. We still set up the nock scopes so
+    // the test will fail if a request slips through.
 
-    // ---------------------------------------------------
-    // Stub: OpenAI chat completions
-    // ---------------------------------------------------
+    // Stub: Google Chat GET – expect **zero** calls.
+    const chatScope = nock(chatBase)
+      .get(threadPath)
+      .query(true)
+      .reply(200, {});
+
+    // Stub: OpenAI chat completions – expect **zero** calls.
     const openaiScope = nock('https://api.openai.com')
       .post('/v1/chat/completions')
-      .reply(200, {
-        choices: [
-          {
-            message: { role: 'assistant', content: 'I am doing well, thanks!' },
-          },
-        ],
-      });
+      .reply(200, {});
 
     // ---------------------------------------------------
     // Invoke handler
@@ -63,9 +50,11 @@ describe('ChatBot.onMessage - AI reply generation', () => {
 
     const response = await onMessage(event);
 
-    expect(response!.text).toBe('I am doing well, thanks!');
+    expect(response!.text).toMatch(/AI reply path disabled/i);
 
-    openaiScope.done(); // ensure the LLM call happened
+    // Neither LLM nor Google Chat endpoints should have been reached
+    expect(openaiScope.isDone()).toBe(false);
+    expect(chatScope.isDone()).toBe(false);
   });
 
   it('ignores slash-command events', async () => {

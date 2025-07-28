@@ -10,11 +10,14 @@ describe('ChatBot additional command & edge-case coverage', () => {
     expect(response).toEqual({ text: 'You said: "Just saying hi!"' });
   });
 
-  it('falls back to error message when LLM provider fails', async () => {
+  // AI_PATH_DISABLED_FOR_MVP – The onMessage handler now short-circuits before
+  // invoking the LLM, therefore it should return the placeholder regardless of
+  // LLM availability.
+  it('returns placeholder when AI path is disabled (LLM errors ignored)', async () => {
     jest.resetModules(); // ensure fresh import & mock isolation
 
     // Dynamically mock the LLM module **before** re-importing ChatBot so the
-    // internal `import()` picks up our stub.
+    // internal `import()` would pick up our stub if it were still executed.
     jest.doMock('../src/llm/index', () => ({
       generateText: jest.fn().mockRejectedValue(new Error('LLM outage')),
     }));
@@ -29,7 +32,7 @@ describe('ChatBot additional command & edge-case coverage', () => {
       },
     } as any);
 
-    expect(res!.text).toMatch(/encountered an error/i);
+    expect(res!.text).toMatch(/AI reply path disabled/i);
   });
 
   it('responds to the built-in ping command', async () => {
